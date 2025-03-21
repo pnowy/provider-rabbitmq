@@ -4,18 +4,18 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.14.0
-  name: mytypes.sample.rabbitmq.crossplane.io
+  name: vhosts.core.rabbitmq.crossplane.io
 spec:
-  group: sample.rabbitmq.crossplane.io
+  group: core.rabbitmq.crossplane.io
   names:
     categories:
     - crossplane
     - managed
     - rabbitmq
-    kind: MyType
-    listKind: MyTypeList
-    plural: mytypes
-    singular: mytype
+    kind: Vhost
+    listKind: VhostList
+    plural: vhosts
+    singular: vhost
   scope: Cluster
   versions:
   - additionalPrinterColumns:
@@ -34,7 +34,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: A MyType is an example API type.
+        description: A Vhost is an example API type.
         properties:
           apiVersion:
             description: |-
@@ -54,7 +54,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: A MyTypeSpec defines the desired state of a MyType.
+            description: A VhostSpec defines the desired state of a Vhost.
             properties:
               deletionPolicy:
                 default: Delete
@@ -71,12 +71,12 @@ spec:
                 - Delete
                 type: string
               forProvider:
-                description: MyTypeParameters are the configurable fields of a MyType.
+                description: VhostParameters are the configurable fields of a Vhost.
                 properties:
-                  configurableField:
+                  hostName:
                     type: string
                 required:
-                - configurableField
+                - hostName
                 type: object
               managementPolicies:
                 default:
@@ -246,17 +246,18 @@ spec:
             - forProvider
             type: object
           status:
-            description: A MyTypeStatus represents the observed state of a MyType.
+            description: A VhostStatus represents the observed state of a Vhost.
             properties:
               atProvider:
-                description: MyTypeObservation are the observable fields of a MyType.
+                description: VhostObservation are the observable fields of a Vhost.
                 properties:
-                  configurableField:
-                    type: string
-                  observableField:
+                  messages:
+                    type: integer
+                  name:
                     type: string
                 required:
-                - configurableField
+                - messages
+                - name
                 type: object
               conditions:
                 description: Conditions of the resource.

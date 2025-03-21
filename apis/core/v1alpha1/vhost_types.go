@@ -27,12 +27,13 @@ import (
 
 // VhostParameters are the configurable fields of a Vhost.
 type VhostParameters struct {
-	ConfigurableField string `json:"configurableField"`
+	HostName string `json:"hostName"`
 }
 
 // VhostObservation are the observable fields of a Vhost.
 type VhostObservation struct {
-	ObservableField string `json:"observableField,omitempty"`
+	Name     string `json:"name"`
+	Messages int    `json:"messages"`
 }
 
 // A VhostSpec defines the desired state of a Vhost.
