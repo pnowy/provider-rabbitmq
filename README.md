@@ -1,7 +1,7 @@
-# provider-template
+# provider-rabbitmq
 
-`provider-template` is a minimal [Crossplane](https://crossplane.io/) Provider
-that is meant to be used as a template for implementing new Providers. It comes
+`provider-rabbitmq` is a minimal [Crossplane](https://crossplane.io/) Provider
+that is meant to be used as a rabbitmq for implementing new Providers. It comes
 with the following features that are meant to be refactored:
 
 - A `ProviderConfig` type that only points to a credentials `Secret`.
@@ -11,7 +11,7 @@ with the following features that are meant to be refactored:
 
 ## Developing
 
-1. Use this repository as a template to create a new one.
+1. Use this repository as a rabbitmq to create a new one.
 1. Run `make submodules` to initialize the "build" Make submodule we use for CI/CD.
 1. Rename the provider by running the following command:
 ```shell
@@ -36,3 +36,8 @@ guide may also be of use.
 
 [CONTRIBUTING.md]: https://github.com/crossplane/crossplane/blob/master/CONTRIBUTING.md
 [provider-dev]: https://github.com/crossplane/crossplane/blob/master/contributing/guide-provider-development.md
+
+
+```
+make provider.prepare provider=RabbitMq
+```
