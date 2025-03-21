@@ -18,7 +18,9 @@ package vhost
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	rabbithole "github.com/michaelklishin/rabbit-hole/v3"
 
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -46,11 +48,29 @@ const (
 	errNewClient = "cannot create new Service"
 )
 
-// A NoOpService does nothing.
-type NoOpService struct{}
+type RabbitMqService struct {
+	rmqc *rabbithole.Client
+}
 
 var (
-	newNoOpService = func(_ []byte) (interface{}, error) { return &NoOpService{}, nil }
+	newRabbitMqService = func(creds []byte) (*RabbitMqService, error) {
+		// Assuming creds is a JSON object with username, password, and endpoint fields
+		var config struct {
+			Username string `json:"username"`
+			Password string `json:"password"`
+			Endpoint string `json:"endpoint"`
+		}
+		if err := json.Unmarshal(creds, &config); err != nil {
+			return nil, errors.Wrap(err, "failed to unmarshal credentials")
+		}
+		c, err := rabbithole.NewClient(config.Endpoint, config.Username, config.Password)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to create RabbitMQ client")
+		}
+		return &RabbitMqService{
+			rmqc: c,
+		}, err
+	}
 )
 
 // Setup adds a controller that reconciles Vhost managed resources.
@@ -67,7 +87,7 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 		managed.WithExternalConnecter(&connector{
 			kube:         mgr.GetClient(),
 			usage:        resource.NewProviderConfigUsageTracker(mgr.GetClient(), &apisv1alpha1.ProviderConfigUsage{}),
-			newServiceFn: newNoOpService}),
+			newServiceFn: newRabbitMqService}),
 		managed.WithLogger(o.Logger.WithValues("controller", name)),
 		managed.WithPollInterval(o.PollInterval),
 		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name))),
@@ -86,7 +106,7 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 type connector struct {
 	kube         client.Client
 	usage        resource.Tracker
-	newServiceFn func(creds []byte) (interface{}, error)
+	newServiceFn func(creds []byte) (*RabbitMqService, error)
 }
 
 // Connect typically produces an ExternalClient by:
