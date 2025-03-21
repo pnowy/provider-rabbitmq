@@ -1,0 +1,11 @@
+# helm dep update
+# helm upgrade rabbitmq . --install --namespace rabbitmq --create-namespace
+# minikube tunnel
+# http://localhost:15672/
+
+rabbitmq:
+  auth:
+    username: guest
+    password: guest
+  service:
+    type: ClusterIP

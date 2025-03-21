@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: rabbitmq-credentials
+stringData:
+  credentials: |
+    {
+      "username": "guest",
+      "password": "guest",
+      "endpoint": "http://localhost:15672"
+    }
+---
+apiVersion: rabbitmq.crossplane.io/v1alpha1
+kind: ProviderConfig
+metadata:
+  name: provider-rabbitmq
+spec:
+  credentials:
+    source: Secret
+    secretRef:
+      name: rabbitmq-credentials
+      namespace: rabbitmq
+      key: credentials
+---
+apiVersion: core.rabbitmq.crossplane.io/v1alpha1
+kind: Vhost
+metadata:
+  name: jurek
+spec:
+  forProvider:
+    hostName: jurek
+  providerConfigRef:
+    name: provider-rabbitmq

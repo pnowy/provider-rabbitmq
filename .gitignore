@@ -7,3 +7,6 @@ cover.out
 .vscode
 .idea
 .DS_Store
+
+Chart.lock
+charts/

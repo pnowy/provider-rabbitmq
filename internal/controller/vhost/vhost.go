@@ -157,6 +157,8 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errNotVhost)
 	}
 
+	// c.service.rmqc.GetVhost(cr.Spec.ForProvider.HostName) // TODO implement get for rabbitmq
+
 	// These fmt statements should be removed in the real implementation.
 	fmt.Printf("Observing: %+v", cr)
 
@@ -207,13 +209,18 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 	}, nil
 }
 
-func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
+func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.ExternalDelete, error) {
 	cr, ok := mg.(*v1alpha1.Vhost)
 	if !ok {
-		return errors.New(errNotVhost)
+		return managed.ExternalDelete{}, errors.New(errNotVhost)
 	}
 
 	fmt.Printf("Deleting: %+v", cr)
 
-	return nil
+	return managed.ExternalDelete{}, nil
+}
+
+func (c *external) Disconnect(ctx context.Context) error {
+	//TODO implement me
+	panic("implement me")
 }

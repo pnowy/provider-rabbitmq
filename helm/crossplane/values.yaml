@@ -1,0 +1,2 @@
+# helm dep update
+# helm upgrade crossplane . --install --namespace crossplane-system --create-namespace
