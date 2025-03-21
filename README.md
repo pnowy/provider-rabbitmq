@@ -40,4 +40,5 @@ guide may also be of use.
 
 ```
 make provider.prepare provider=RabbitMq
+make provider.addtype provider=RabbitMq group=core kind=Vhost
 ```
