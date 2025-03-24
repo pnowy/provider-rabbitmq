@@ -33,21 +33,25 @@ type VhostParameters struct {
 
 type VhostSettings struct {
 	// Virtual host description
-	Description string `json:"description,omitempty"`
+	Description *string `json:"description,omitempty"`
 	// Virtual host tags
 	Tags VhostTags `json:"tags,omitempty"`
 	// Type of queue to create in virtual host when unspecified in queue level
-	DefaultQueueType string `json:"defaultQueueType,omitempty"`
+	DefaultQueueType *string `json:"defaultQueueType,omitempty"`
 	// True if tracing should be enabled
-	Tracing bool `json:"tracing,omitempty"`
+	Tracing *bool `json:"tracing,omitempty"`
 }
 
 type VhostTags []string
 
 // VhostObservation are the observable fields of a Vhost.
 type VhostObservation struct {
-	Name     string `json:"name"`
-	Messages int    `json:"messages"`
+	Name                   string  `json:"name"`
+	Description            *string `json:"description,omitempty"`
+	DefaultQueueType       *string `json:"defaultQueueType,omitempty"`
+	Messages               int     `json:"messages"`
+	MessagesReady          int     `json:"messagesReady"`
+	MessagesUnacknowledged int     `json:"messagesUnacknowledged"`
 }
 
 // A VhostSpec defines the desired state of a Vhost.

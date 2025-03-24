@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	rabbithole "github.com/michaelklishin/rabbit-hole/v3"
 	"net/http"
 
@@ -156,9 +157,42 @@ type external struct {
 	service *RabbitMqService
 }
 
-//func GenerateVhost(grp *rabbithole.VhostInfo) v1alpha1.VhostObservation {
-//
-//}
+// GenerateVhostObservation is used to produce v1alpha1.GroupGitLabObservation from gitlab.Group.
+func GenerateVhostObservation(vh *rabbithole.VhostInfo) v1alpha1.VhostObservation {
+	if vh == nil {
+		return v1alpha1.VhostObservation{}
+	}
+	vhost := v1alpha1.VhostObservation{
+		Name:                   vh.Name,
+		Description:            &vh.Description,
+		DefaultQueueType:       &vh.DefaultQueueType,
+		Messages:               vh.Messages,
+		MessagesReady:          vh.MessagesReady,
+		MessagesUnacknowledged: vh.MessagesUnacknowledged,
+	}
+	return vhost
+}
+
+func GenerateCreateVhostOptions(p *v1alpha1.VhostSettings) rabbithole.VhostSettings {
+	if p == nil {
+		return rabbithole.VhostSettings{}
+	}
+	settings := rabbithole.VhostSettings{}
+	if p.DefaultQueueType != nil {
+		settings.DefaultQueueType = *p.DefaultQueueType
+	}
+	if p.Description != nil {
+		settings.Description = *p.Description
+	}
+	if p.Tracing != nil {
+		settings.Tracing = *p.Tracing
+	}
+	if len(p.Tags) > 0 {
+		settings.Tags = make([]string, len(p.Tags))
+		copy(settings.Tags, p.Tags)
+	}
+	return settings
+}
 
 func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
 	cr, ok := mg.(*v1alpha1.Vhost)
@@ -183,6 +217,9 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	fmt.Printf("RabbitHole.Description: '%+v'\n", rmqVhost.Description)
 	fmt.Printf("RabbitHole.Trace: %+v\n", rmqVhost.Tracing)
 
+	cr.Status.AtProvider = GenerateVhostObservation(rmqVhost)
+	cr.Status.SetConditions(xpv1.Available())
+
 	return managed.ExternalObservation{
 		// Return false when the external resource does not exist. This lets
 		// the managed resource reconciler know that it needs to call Create to
@@ -205,8 +242,8 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	if !ok {
 		return managed.ExternalCreation{}, errors.New(errNotVhost)
 	}
-	fmt.Printf("Creating: %+v", cr.Spec.ForProvider)
-	_, err := c.service.rmqc.PutVhost(cr.Spec.ForProvider.HostName, rabbithole.VhostSettings{})
+	fmt.Printf("Creating vhost: %+v", cr.Spec.ForProvider.HostName)
+	_, err := c.service.rmqc.PutVhost(cr.Spec.ForProvider.HostName, GenerateCreateVhostOptions(cr.Spec.ForProvider.VhostSettings))
 	if err != nil {
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateFailed)
 	}
@@ -224,7 +261,7 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalUpdate{}, errors.New(errNotVhost)
 	}
 
-	fmt.Printf("Updating: %+v", cr)
+	fmt.Printf("Updating vhost: %+v", cr)
 
 	return managed.ExternalUpdate{
 		// Optionally return any details that may be required to connect to the
@@ -238,7 +275,7 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 	if !ok {
 		return managed.ExternalDelete{}, errors.New(errNotVhost)
 	}
-	fmt.Printf("Deleting: %+v", cr.Spec.ForProvider)
+	fmt.Printf("Deleting vhost: %+v", cr.Spec.ForProvider.HostName)
 	_, err := c.service.rmqc.DeleteVhost(cr.Spec.ForProvider.HostName)
 	if err != nil {
 		fmt.Printf("Error deleting Vhost: %+v\n", err)

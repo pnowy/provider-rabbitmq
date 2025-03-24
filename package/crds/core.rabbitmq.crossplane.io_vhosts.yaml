@@ -269,12 +269,22 @@ spec:
               atProvider:
                 description: VhostObservation are the observable fields of a Vhost.
                 properties:
+                  defaultQueueType:
+                    type: string
+                  description:
+                    type: string
                   messages:
+                    type: integer
+                  messagesReady:
+                    type: integer
+                  messagesUnacknowledged:
                     type: integer
                   name:
                     type: string
                 required:
                 - messages
+                - messagesReady
+                - messagesUnacknowledged
                 - name
                 type: object
               conditions:
