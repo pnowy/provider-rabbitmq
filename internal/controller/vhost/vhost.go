@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	rabbithole "github.com/michaelklishin/rabbit-hole/v3"
+	"net/http"
 
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -41,6 +42,8 @@ import (
 
 const (
 	errNotVhost     = "managed resource is not a Vhost custom resource"
+	errGetFailed    = "cannot get RabbitMq vhost"
+	errCreateFailed = "cannot create RabbitMq vhost"
 	errTrackPCUsage = "cannot track ProviderConfig usage"
 	errGetPC        = "cannot get ProviderConfig"
 	errGetCreds     = "cannot get credentials"
@@ -52,17 +55,19 @@ type RabbitMqService struct {
 	rmqc *rabbithole.Client
 }
 
+type RabbitMqCredentials struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+	Endpoint string `json:"endpoint"`
+}
+
 var (
 	newRabbitMqService = func(creds []byte) (*RabbitMqService, error) {
-		// Assuming creds is a JSON object with username, password, and endpoint fields
-		var config struct {
-			Username string `json:"username"`
-			Password string `json:"password"`
-			Endpoint string `json:"endpoint"`
-		}
+		var config = new(RabbitMqCredentials)
 		if err := json.Unmarshal(creds, &config); err != nil {
 			return nil, errors.Wrap(err, "failed to unmarshal credentials")
 		}
+		fmt.Printf("RabbitMq address: %s\n", config.Endpoint)
 		c, err := rabbithole.NewClient(config.Endpoint, config.Username, config.Password)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to create RabbitMQ client")
@@ -156,11 +161,18 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	if !ok {
 		return managed.ExternalObservation{}, errors.New(errNotVhost)
 	}
-
-	// c.service.rmqc.GetVhost(cr.Spec.ForProvider.HostName) // TODO implement get for rabbitmq
-
-	// These fmt statements should be removed in the real implementation.
-	fmt.Printf("Observing: %+v", cr)
+	fmt.Printf("Observing: %+v\n", cr.Spec.ForProvider)
+	rmqVhost, err := c.service.rmqc.GetVhost(cr.Spec.ForProvider.HostName)
+	if err != nil {
+		var errResp rabbithole.ErrorResponse
+		if errors.As(err, &errResp) && errResp.StatusCode == http.StatusNotFound {
+			return managed.ExternalObservation{
+				ResourceExists: false,
+			}, nil
+		}
+		return managed.ExternalObservation{}, errors.Wrap(err, errGetFailed)
+	}
+	fmt.Printf("Vhost: %+v\n", rmqVhost.Messages)
 
 	return managed.ExternalObservation{
 		// Return false when the external resource does not exist. This lets
@@ -184,8 +196,11 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	if !ok {
 		return managed.ExternalCreation{}, errors.New(errNotVhost)
 	}
-
-	fmt.Printf("Creating: %+v", cr)
+	fmt.Printf("Creating: %+v", cr.Spec.ForProvider)
+	_, err := c.service.rmqc.PutVhost(cr.Spec.ForProvider.HostName, rabbithole.VhostSettings{})
+	if err != nil {
+		return managed.ExternalCreation{}, errors.Wrap(err, errCreateFailed)
+	}
 
 	return managed.ExternalCreation{
 		// Optionally return any details that may be required to connect to the
@@ -214,9 +229,12 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 	if !ok {
 		return managed.ExternalDelete{}, errors.New(errNotVhost)
 	}
-
-	fmt.Printf("Deleting: %+v", cr)
-
+	fmt.Printf("Deleting: %+v", cr.Spec.ForProvider)
+	_, err := c.service.rmqc.DeleteVhost(cr.Spec.ForProvider.HostName)
+	if err != nil {
+		fmt.Printf("Error deleting Vhost: %+v\n", err)
+		return managed.ExternalDelete{}, errors.Wrap(err, errCreateFailed)
+	}
 	return managed.ExternalDelete{}, nil
 }
 
