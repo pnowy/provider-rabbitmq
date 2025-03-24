@@ -18,6 +18,7 @@ limitations under the License.
 package apis
 
 import (
+	"github.com/google/go-cmp/cmp"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	corev1alpha1 "github.com/crossplane/provider-rabbitmq/apis/core/v1alpha1"
@@ -38,4 +39,44 @@ var AddToSchemes runtime.SchemeBuilder
 // AddToScheme adds all Resources to the Scheme
 func AddToScheme(s *runtime.Scheme) error {
 	return AddToSchemes.AddToScheme(s)
+}
+
+// IsBoolEqualToBoolPtr compares a *bool with bool
+func IsBoolEqualToBoolPtr(bp *bool, b bool) bool {
+	if bp != nil {
+		if !cmp.Equal(*bp, b) {
+			return false
+		}
+	}
+	return true
+}
+
+// IsIntEqualToIntPtr compares an *int with int
+func IsIntEqualToIntPtr(ip *int, i int) bool {
+	if ip != nil {
+		if !cmp.Equal(*ip, i) {
+			return false
+		}
+	}
+	return true
+}
+
+// IsStringEqualToStringPtr compares a string with *string
+func IsStringEqualToStringPtr(sp *string, s string) bool {
+	if sp != nil {
+		if !cmp.Equal(*sp, s) {
+			return false
+		}
+	}
+	return true
+}
+
+// IsStringPtrEqualToString compares a *string with string
+func IsStringPtrEqualToString(sp *string, s string) bool {
+	if sp != nil {
+		if !cmp.Equal(*sp, s) {
+			return false
+		}
+	}
+	return true
 }

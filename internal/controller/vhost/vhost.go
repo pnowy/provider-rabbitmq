@@ -21,6 +21,8 @@ import (
 	"encoding/json"
 	"fmt"
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	"github.com/crossplane/provider-rabbitmq/apis"
+	"github.com/google/go-cmp/cmp"
 	rabbithole "github.com/michaelklishin/rabbit-hole/v3"
 	"net/http"
 
@@ -194,6 +196,41 @@ func GenerateCreateVhostOptions(p *v1alpha1.VhostSettings) rabbithole.VhostSetti
 	return settings
 }
 
+func lateInitializeVhost(spec *v1alpha1.VhostParameters, api *rabbithole.VhostInfo) error {
+	if api == nil {
+		return nil
+	}
+	if spec.VhostSettings == nil {
+		spec.VhostSettings = &v1alpha1.VhostSettings{}
+	}
+	if spec.VhostSettings.DefaultQueueType == nil {
+		spec.VhostSettings.DefaultQueueType = &api.DefaultQueueType
+	}
+	if spec.VhostSettings.Description == nil {
+		spec.VhostSettings.Description = &api.Description
+	}
+	if spec.VhostSettings.Tracing == nil {
+		spec.VhostSettings.Tracing = &api.Tracing
+	}
+	if len(api.Tags) > 0 && len(spec.VhostSettings.Tags) > 0 {
+		spec.VhostSettings.Tags = make([]string, len(api.Tags))
+		copy(spec.VhostSettings.Tags, api.Tags)
+	}
+	return nil
+}
+
+func isVhostUpToDate(spec *v1alpha1.VhostParameters, api *rabbithole.VhostInfo) (bool, error) { //nolint:gocyclo
+	if spec.VhostSettings != nil {
+		if !apis.IsStringPtrEqualToString(spec.VhostSettings.Description, api.Description) {
+			return false, nil
+		}
+		if !apis.IsStringPtrEqualToString(spec.VhostSettings.DefaultQueueType, api.DefaultQueueType) {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
 func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
 	cr, ok := mg.(*v1alpha1.Vhost)
 	if !ok {
@@ -210,27 +247,42 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.Wrap(err, errGetFailed)
 	}
 
-	fmt.Printf("ForProvider.HostName: %v\n", cr.Spec.ForProvider.HostName)
-	fmt.Printf("ForProvider.VhostSettings: %v\n", *cr.Spec.ForProvider.VhostSettings)
-	fmt.Printf("RabbitHole.Tags: %+v\n", rmqVhost.Tags)
-	fmt.Printf("RabbitHole.DefaultQueueType: %+v\n", rmqVhost.DefaultQueueType)
-	fmt.Printf("RabbitHole.Description: '%+v'\n", rmqVhost.Description)
-	fmt.Printf("RabbitHole.Trace: %+v\n", rmqVhost.Tracing)
+	//fmt.Printf("ForProvider.HostName: %v\n", cr.Spec.ForProvider.HostName)
+	//fmt.Printf("ForProvider.VhostSettings.DefaultQueueType: %v\n", *cr.Spec.ForProvider.VhostSettings.DefaultQueueType)
+	//fmt.Printf("RabbitHole.Tags: %+v\n", rmqVhost.Tags)
+	//fmt.Printf("RabbitHole.DefaultQueueType: %+v\n", rmqVhost.DefaultQueueType)
+	//fmt.Printf("RabbitHole.Description: '%+v'\n", rmqVhost.Description)
+	//fmt.Printf("RabbitHole.Trace: %+v\n", rmqVhost.Tracing)
+
+	current := cr.Spec.ForProvider.DeepCopy()
+	err = lateInitializeVhost(&cr.Spec.ForProvider, rmqVhost)
+	if err != nil {
+		return managed.ExternalObservation{}, errors.Wrap(err, errGetFailed)
+	}
+	isResourceLateInitialized := !cmp.Equal(current, &cr.Spec.ForProvider)
+	fmt.Printf("LateInitializeVhost: %v\n", isResourceLateInitialized)
 
 	cr.Status.AtProvider = GenerateVhostObservation(rmqVhost)
 	cr.Status.SetConditions(xpv1.Available())
+
+	isUpToDate, err := isVhostUpToDate(&cr.Spec.ForProvider, rmqVhost)
+	if err != nil {
+		return managed.ExternalObservation{}, errors.Wrap(err, errGetFailed)
+	}
+	fmt.Printf("IsUpToDate: %v\n", isUpToDate)
 
 	return managed.ExternalObservation{
 		// Return false when the external resource does not exist. This lets
 		// the managed resource reconciler know that it needs to call Create to
 		// (re)create the resource, or that it has successfully been deleted.
 		ResourceExists: true,
-
 		// Return false when the external resource exists, but it not up to date
 		// with the desired managed resource state. This lets the managed
 		// resource reconciler know that it needs to call Update.
 		ResourceUpToDate: true,
-
+		// ResourceLateInitialized should be true if the managed resource's spec was
+		// updated during its observation.
+		ResourceLateInitialized: isResourceLateInitialized,
 		// Return any details that may be required to connect to the external
 		// resource. These will be stored as the connection secret.
 		ConnectionDetails: managed.ConnectionDetails{},
