@@ -33,13 +33,13 @@ type VhostParameters struct {
 
 type VhostSettings struct {
 	// Virtual host description
-	Description string `json:"description"`
+	Description string `json:"description,omitempty"`
 	// Virtual host tags
-	Tags VhostTags `json:"tags"`
+	Tags VhostTags `json:"tags,omitempty"`
 	// Type of queue to create in virtual host when unspecified in queue level
-	DefaultQueueType *string `json:"default_queue_type,omitempty"`
+	DefaultQueueType string `json:"defaultQueueType,omitempty"`
 	// True if tracing should be enabled
-	Tracing bool `json:"tracing"`
+	Tracing bool `json:"tracing,omitempty"`
 }
 
 type VhostTags []string

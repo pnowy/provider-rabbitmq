@@ -25,9 +25,11 @@ spec:
 apiVersion: core.rabbitmq.crossplane.io/v1alpha1
 kind: Vhost
 metadata:
-  name: jurek
+  name: cortex
 spec:
   forProvider:
-    hostName: jurek
+    hostName: cortex
+    vhostSettings:
+      defaultQueueType: classic
   providerConfigRef:
     name: provider-rabbitmq

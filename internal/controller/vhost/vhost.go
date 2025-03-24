@@ -156,12 +156,15 @@ type external struct {
 	service *RabbitMqService
 }
 
+//func GenerateVhost(grp *rabbithole.VhostInfo) v1alpha1.VhostObservation {
+//
+//}
+
 func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
 	cr, ok := mg.(*v1alpha1.Vhost)
 	if !ok {
 		return managed.ExternalObservation{}, errors.New(errNotVhost)
 	}
-	fmt.Printf("Observing: %+v\n", cr.Spec.ForProvider)
 	rmqVhost, err := c.service.rmqc.GetVhost(cr.Spec.ForProvider.HostName)
 	if err != nil {
 		var errResp rabbithole.ErrorResponse
@@ -172,7 +175,13 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		}
 		return managed.ExternalObservation{}, errors.Wrap(err, errGetFailed)
 	}
-	fmt.Printf("Vhost: %+v\n", rmqVhost.Messages)
+
+	fmt.Printf("ForProvider.HostName: %v\n", cr.Spec.ForProvider.HostName)
+	fmt.Printf("ForProvider.VhostSettings: %v\n", *cr.Spec.ForProvider.VhostSettings)
+	fmt.Printf("RabbitHole.Tags: %+v\n", rmqVhost.Tags)
+	fmt.Printf("RabbitHole.DefaultQueueType: %+v\n", rmqVhost.DefaultQueueType)
+	fmt.Printf("RabbitHole.Description: '%+v'\n", rmqVhost.Description)
+	fmt.Printf("RabbitHole.Trace: %+v\n", rmqVhost.Tracing)
 
 	return managed.ExternalObservation{
 		// Return false when the external resource does not exist. This lets
