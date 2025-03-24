@@ -75,6 +75,28 @@ spec:
                 properties:
                   hostName:
                     type: string
+                  vhostSettings:
+                    properties:
+                      default_queue_type:
+                        description: Type of queue to create in virtual host when
+                          unspecified in queue level
+                        type: string
+                      description:
+                        description: Virtual host description
+                        type: string
+                      tags:
+                        description: Virtual host tags
+                        items:
+                          type: string
+                        type: array
+                      tracing:
+                        description: True if tracing should be enabled
+                        type: boolean
+                    required:
+                    - description
+                    - tags
+                    - tracing
+                    type: object
                 required:
                 - hostName
                 type: object

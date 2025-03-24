@@ -27,8 +27,22 @@ import (
 
 // VhostParameters are the configurable fields of a Vhost.
 type VhostParameters struct {
-	HostName string `json:"hostName"`
+	HostName      string         `json:"hostName"`
+	VhostSettings *VhostSettings `json:"vhostSettings,omitempty"`
 }
+
+type VhostSettings struct {
+	// Virtual host description
+	Description string `json:"description"`
+	// Virtual host tags
+	Tags VhostTags `json:"tags"`
+	// Type of queue to create in virtual host when unspecified in queue level
+	DefaultQueueType *string `json:"default_queue_type,omitempty"`
+	// True if tracing should be enabled
+	Tracing bool `json:"tracing"`
+}
+
+type VhostTags []string
 
 // VhostObservation are the observable fields of a Vhost.
 type VhostObservation struct {
