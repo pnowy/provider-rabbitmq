@@ -23,11 +23,11 @@ import (
 	"net/http"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-	"github.com/crossplane/provider-rabbitmq/apis"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	rabbithole "github.com/michaelklishin/rabbit-hole/v3"
 	"github.com/pkg/errors"
+	"github.com/pnowy/provider-rabbitmq/apis"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -39,9 +39,9 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 
-	"github.com/crossplane/provider-rabbitmq/apis/core/v1alpha1"
-	apisv1alpha1 "github.com/crossplane/provider-rabbitmq/apis/v1alpha1"
-	"github.com/crossplane/provider-rabbitmq/internal/features"
+	"github.com/pnowy/provider-rabbitmq/apis/core/v1alpha1"
+	apisv1alpha1 "github.com/pnowy/provider-rabbitmq/apis/v1alpha1"
+	"github.com/pnowy/provider-rabbitmq/internal/features"
 )
 
 const (

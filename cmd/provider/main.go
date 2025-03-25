@@ -37,10 +37,10 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/ratelimiter"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 
-	"github.com/crossplane/provider-rabbitmq/apis"
-	"github.com/crossplane/provider-rabbitmq/apis/v1alpha1"
-	rabbitmq "github.com/crossplane/provider-rabbitmq/internal/controller"
-	"github.com/crossplane/provider-rabbitmq/internal/features"
+	"github.com/pnowy/provider-rabbitmq/apis"
+	"github.com/pnowy/provider-rabbitmq/apis/v1alpha1"
+	rabbitmq "github.com/pnowy/provider-rabbitmq/internal/controller"
+	"github.com/pnowy/provider-rabbitmq/internal/features"
 )
 
 func main() {
