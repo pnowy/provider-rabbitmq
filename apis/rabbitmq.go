@@ -18,11 +18,10 @@ limitations under the License.
 package apis
 
 import (
-	"github.com/google/go-cmp/cmp"
-	"k8s.io/apimachinery/pkg/runtime"
-
 	corev1alpha1 "github.com/crossplane/provider-rabbitmq/apis/core/v1alpha1"
 	rabbitmqv1alpha1 "github.com/crossplane/provider-rabbitmq/apis/v1alpha1"
+	"github.com/google/go-cmp/cmp"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 func init() {
