@@ -20,6 +20,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
+
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/provider-rabbitmq/apis"
 	"github.com/google/go-cmp/cmp"
@@ -27,7 +29,6 @@ import (
 	rabbithole "github.com/michaelklishin/rabbit-hole/v3"
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/types"
-	"net/http"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -196,9 +197,9 @@ func GenerateClientVhostOptions(spec *v1alpha1.VhostSettings) rabbithole.VhostSe
 	return settings
 }
 
-func lateInitializeVhost(spec *v1alpha1.VhostParameters, api *rabbithole.VhostInfo) error {
+func lateInitializeVhost(spec *v1alpha1.VhostParameters, api *rabbithole.VhostInfo) {
 	if api == nil {
-		return nil
+		return
 	}
 	if spec.VhostSettings == nil {
 		spec.VhostSettings = &v1alpha1.VhostSettings{}
@@ -216,25 +217,24 @@ func lateInitializeVhost(spec *v1alpha1.VhostParameters, api *rabbithole.VhostIn
 		spec.VhostSettings.Tags = make([]string, len(api.Tags))
 		copy(spec.VhostSettings.Tags, api.Tags)
 	}
-	return nil
 }
 
-func isVhostUpToDate(spec *v1alpha1.VhostParameters, api *rabbithole.VhostInfo) (bool, error) { //nolint:gocyclo
+func isVhostUpToDate(spec *v1alpha1.VhostParameters, api *rabbithole.VhostInfo) bool { //nolint:gocyclo
 	if spec.VhostSettings != nil {
 		if !apis.IsStringPtrEqualToString(spec.VhostSettings.Description, api.Description) {
-			return false, nil
+			return false
 		}
 		if !apis.IsStringPtrEqualToString(spec.VhostSettings.DefaultQueueType, api.DefaultQueueType) {
-			return false, nil
+			return false
 		}
 		if !apis.IsBoolPtrEqualToBool(spec.VhostSettings.Tracing, api.Tracing) {
-			return false, nil
+			return false
 		}
 		if !cmp.Equal([]string(spec.VhostSettings.Tags), []string(api.Tags), cmpopts.EquateEmpty()) {
-			return false, nil
+			return false
 		}
 	}
-	return true, nil
+	return true
 }
 
 func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
@@ -254,19 +254,13 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}
 
 	current := cr.Spec.ForProvider.DeepCopy()
-	err = lateInitializeVhost(&cr.Spec.ForProvider, rmqVhost)
-	if err != nil {
-		return managed.ExternalObservation{}, errors.Wrap(err, errGetFailed)
-	}
+	lateInitializeVhost(&cr.Spec.ForProvider, rmqVhost)
 	isResourceLateInitialized := !cmp.Equal(current, &cr.Spec.ForProvider)
 
 	cr.Status.AtProvider = GenerateVhostObservation(rmqVhost)
 	cr.Status.SetConditions(xpv1.Available())
 
-	isUpToDate, err := isVhostUpToDate(&cr.Spec.ForProvider, rmqVhost)
-	if err != nil {
-		return managed.ExternalObservation{}, errors.Wrap(err, errGetFailed)
-	}
+	isUpToDate := isVhostUpToDate(&cr.Spec.ForProvider, rmqVhost)
 	fmt.Printf("IsUpToDate: %v, LateInitializeVhost: %v\n", isUpToDate, isResourceLateInitialized)
 
 	return managed.ExternalObservation{
@@ -293,9 +287,12 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, errors.New(errNotVhost)
 	}
 	fmt.Printf("Creating vhost: %+v", cr.Spec.ForProvider.HostName)
-	_, err := c.service.rmqc.PutVhost(cr.Spec.ForProvider.HostName, GenerateClientVhostOptions(cr.Spec.ForProvider.VhostSettings))
+	resp, err := c.service.rmqc.PutVhost(cr.Spec.ForProvider.HostName, GenerateClientVhostOptions(cr.Spec.ForProvider.VhostSettings))
 	if err != nil {
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateFailed)
+	}
+	if err := resp.Body.Close(); err != nil {
+		fmt.Printf("Error closing response body: %v\n", err)
 	}
 
 	return managed.ExternalCreation{
@@ -313,9 +310,12 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 
 	fmt.Printf("Updating vhost: %+v\n", cr.Spec.ForProvider.HostName)
 	options := GenerateClientVhostOptions(cr.Spec.ForProvider.VhostSettings)
-	_, err := c.service.rmqc.PutVhost(cr.Spec.ForProvider.HostName, options)
+	resp, err := c.service.rmqc.PutVhost(cr.Spec.ForProvider.HostName, options)
 	if err != nil {
 		return managed.ExternalUpdate{}, errors.Wrap(err, errCreateFailed)
+	}
+	if err := resp.Body.Close(); err != nil {
+		fmt.Printf("Error closing response body: %v\n", err)
 	}
 
 	return managed.ExternalUpdate{
@@ -331,10 +331,13 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalDelete{}, errors.New(errNotVhost)
 	}
 	fmt.Printf("Deleting vhost: %+v", cr.Spec.ForProvider.HostName)
-	_, err := c.service.rmqc.DeleteVhost(cr.Spec.ForProvider.HostName)
+	resp, err := c.service.rmqc.DeleteVhost(cr.Spec.ForProvider.HostName)
 	if err != nil {
 		fmt.Printf("Error deleting Vhost: %+v\n", err)
 		return managed.ExternalDelete{}, errors.Wrap(err, errCreateFailed)
+	}
+	if err := resp.Body.Close(); err != nil {
+		fmt.Printf("Error closing response body: %v\n", err)
 	}
 	return managed.ExternalDelete{}, nil
 }
