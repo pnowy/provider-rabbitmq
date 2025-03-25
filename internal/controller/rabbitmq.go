@@ -20,8 +20,8 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/controller"
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	"github.com/crossplane/provider-rabbitmq/internal/controller/config"
-	"github.com/crossplane/provider-rabbitmq/internal/controller/vhost"
+	"github.com/pnowy/provider-rabbitmq/internal/controller/config"
+	"github.com/pnowy/provider-rabbitmq/internal/controller/vhost"
 )
 
 // Setup creates all RabbitMq controllers with the supplied logger and adds them to
