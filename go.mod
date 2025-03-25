@@ -1,4 +1,4 @@
-module github.com/crossplane/provider-rabbitmq
+module github.com/pnowy/provider-rabbitmq
 
 go 1.22.0
 
