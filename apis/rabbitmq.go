@@ -51,6 +51,15 @@ func IsBoolEqualToBoolPtr(bp *bool, b bool) bool {
 	return true
 }
 
+func IsBoolPtrEqualToBool(bp *bool, b bool) bool {
+	if bp != nil {
+		if !cmp.Equal(*bp, b) {
+			return false
+		}
+	}
+	return true
+}
+
 // IsIntEqualToIntPtr compares an *int with int
 func IsIntEqualToIntPtr(ip *int, i int) bool {
 	if ip != nil {

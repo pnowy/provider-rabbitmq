@@ -23,11 +23,11 @@ import (
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/provider-rabbitmq/apis"
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	rabbithole "github.com/michaelklishin/rabbit-hole/v3"
-	"net/http"
-
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"net/http"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -175,23 +175,23 @@ func GenerateVhostObservation(vh *rabbithole.VhostInfo) v1alpha1.VhostObservatio
 	return vhost
 }
 
-func GenerateCreateVhostOptions(p *v1alpha1.VhostSettings) rabbithole.VhostSettings {
-	if p == nil {
+func GenerateClientVhostOptions(spec *v1alpha1.VhostSettings) rabbithole.VhostSettings {
+	if spec == nil {
 		return rabbithole.VhostSettings{}
 	}
 	settings := rabbithole.VhostSettings{}
-	if p.DefaultQueueType != nil {
-		settings.DefaultQueueType = *p.DefaultQueueType
+	if spec.DefaultQueueType != nil {
+		settings.DefaultQueueType = *spec.DefaultQueueType
 	}
-	if p.Description != nil {
-		settings.Description = *p.Description
+	if spec.Description != nil {
+		settings.Description = *spec.Description
 	}
-	if p.Tracing != nil {
-		settings.Tracing = *p.Tracing
+	if spec.Tracing != nil {
+		settings.Tracing = *spec.Tracing
 	}
-	if len(p.Tags) > 0 {
-		settings.Tags = make([]string, len(p.Tags))
-		copy(settings.Tags, p.Tags)
+	if len(spec.Tags) > 0 {
+		settings.Tags = make([]string, len(spec.Tags))
+		copy(settings.Tags, spec.Tags)
 	}
 	return settings
 }
@@ -227,6 +227,12 @@ func isVhostUpToDate(spec *v1alpha1.VhostParameters, api *rabbithole.VhostInfo) 
 		if !apis.IsStringPtrEqualToString(spec.VhostSettings.DefaultQueueType, api.DefaultQueueType) {
 			return false, nil
 		}
+		if !apis.IsBoolPtrEqualToBool(spec.VhostSettings.Tracing, api.Tracing) {
+			return false, nil
+		}
+		if !cmp.Equal([]string(spec.VhostSettings.Tags), []string(api.Tags), cmpopts.EquateEmpty()) {
+			return false, nil
+		}
 	}
 	return true, nil
 }
@@ -247,20 +253,12 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.Wrap(err, errGetFailed)
 	}
 
-	//fmt.Printf("ForProvider.HostName: %v\n", cr.Spec.ForProvider.HostName)
-	//fmt.Printf("ForProvider.VhostSettings.DefaultQueueType: %v\n", *cr.Spec.ForProvider.VhostSettings.DefaultQueueType)
-	//fmt.Printf("RabbitHole.Tags: %+v\n", rmqVhost.Tags)
-	//fmt.Printf("RabbitHole.DefaultQueueType: %+v\n", rmqVhost.DefaultQueueType)
-	//fmt.Printf("RabbitHole.Description: '%+v'\n", rmqVhost.Description)
-	//fmt.Printf("RabbitHole.Trace: %+v\n", rmqVhost.Tracing)
-
 	current := cr.Spec.ForProvider.DeepCopy()
 	err = lateInitializeVhost(&cr.Spec.ForProvider, rmqVhost)
 	if err != nil {
 		return managed.ExternalObservation{}, errors.Wrap(err, errGetFailed)
 	}
 	isResourceLateInitialized := !cmp.Equal(current, &cr.Spec.ForProvider)
-	fmt.Printf("LateInitializeVhost: %v\n", isResourceLateInitialized)
 
 	cr.Status.AtProvider = GenerateVhostObservation(rmqVhost)
 	cr.Status.SetConditions(xpv1.Available())
@@ -269,7 +267,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	if err != nil {
 		return managed.ExternalObservation{}, errors.Wrap(err, errGetFailed)
 	}
-	fmt.Printf("IsUpToDate: %v\n", isUpToDate)
+	fmt.Printf("IsUpToDate: %v, LateInitializeVhost: %v\n", isUpToDate, isResourceLateInitialized)
 
 	return managed.ExternalObservation{
 		// Return false when the external resource does not exist. This lets
@@ -279,7 +277,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		// Return false when the external resource exists, but it not up to date
 		// with the desired managed resource state. This lets the managed
 		// resource reconciler know that it needs to call Update.
-		ResourceUpToDate: true,
+		ResourceUpToDate: isUpToDate,
 		// ResourceLateInitialized should be true if the managed resource's spec was
 		// updated during its observation.
 		ResourceLateInitialized: isResourceLateInitialized,
@@ -295,7 +293,7 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, errors.New(errNotVhost)
 	}
 	fmt.Printf("Creating vhost: %+v", cr.Spec.ForProvider.HostName)
-	_, err := c.service.rmqc.PutVhost(cr.Spec.ForProvider.HostName, GenerateCreateVhostOptions(cr.Spec.ForProvider.VhostSettings))
+	_, err := c.service.rmqc.PutVhost(cr.Spec.ForProvider.HostName, GenerateClientVhostOptions(cr.Spec.ForProvider.VhostSettings))
 	if err != nil {
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateFailed)
 	}
@@ -313,7 +311,12 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalUpdate{}, errors.New(errNotVhost)
 	}
 
-	fmt.Printf("Updating vhost: %+v", cr)
+	fmt.Printf("Updating vhost: %+v\n", cr.Spec.ForProvider.HostName)
+	options := GenerateClientVhostOptions(cr.Spec.ForProvider.VhostSettings)
+	_, err := c.service.rmqc.PutVhost(cr.Spec.ForProvider.HostName, options)
+	if err != nil {
+		return managed.ExternalUpdate{}, errors.Wrap(err, errCreateFailed)
+	}
 
 	return managed.ExternalUpdate{
 		// Optionally return any details that may be required to connect to the
