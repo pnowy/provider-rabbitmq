@@ -5,7 +5,6 @@ PROJECT_NAME := provider-rabbitmq
 PROJECT_REPO := github.com/pnowy/$(PROJECT_NAME)
 
 PLATFORMS ?= linux_amd64 linux_arm64
-REGISTRY_ORGS ?= ghcr.io
 -include build/makelib/common.mk
 
 # ====================================================================================
@@ -31,7 +30,7 @@ GO111MODULE = on
 
 # ====================================================================================
 # Setup Images
-
+REGISTRY_ORGS ?= ghcr.io
 IMAGES = provider-rabbitmq
 -include build/makelib/imagelight.mk
 
