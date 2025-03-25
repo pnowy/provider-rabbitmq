@@ -1,9 +1,11 @@
 # ====================================================================================
 # Setup Project
 PROJECT_NAME := provider-rabbitmq
-PROJECT_REPO := github.com/crossplane/$(PROJECT_NAME)
+#PROJECT_REPO := github.com/crossplane/$(PROJECT_NAME)
+PROJECT_REPO := github.com/pnowy/$(PROJECT_NAME)
 
 PLATFORMS ?= linux_amd64 linux_arm64
+REGISTRY_ORGS ?= ghcr.io
 -include build/makelib/common.mk
 
 # ====================================================================================
