@@ -2,7 +2,7 @@ module github.com/crossplane/provider-rabbitmq
 
 go 1.22.0
 
-toolchain go1.24.1
+toolchain go1.23.7
 
 require (
 	github.com/crossplane/crossplane-runtime v1.19.0
