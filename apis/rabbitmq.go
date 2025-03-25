@@ -18,9 +18,9 @@ limitations under the License.
 package apis
 
 import (
-	corev1alpha1 "github.com/crossplane/provider-rabbitmq/apis/core/v1alpha1"
-	rabbitmqv1alpha1 "github.com/crossplane/provider-rabbitmq/apis/v1alpha1"
 	"github.com/google/go-cmp/cmp"
+	corev1alpha1 "github.com/pnowy/provider-rabbitmq/apis/core/v1alpha1"
+	rabbitmqv1alpha1 "github.com/pnowy/provider-rabbitmq/apis/v1alpha1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
