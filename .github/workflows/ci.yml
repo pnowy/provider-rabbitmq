@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - release-*
+      - fix-ci # temporary
   pull_request: {}
   workflow_dispatch: {}
 
