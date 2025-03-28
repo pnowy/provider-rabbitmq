@@ -261,7 +261,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	cr.Status.SetConditions(xpv1.Available())
 
 	isUpToDate := isVhostUpToDate(&cr.Spec.ForProvider, rmqVhost)
-	fmt.Printf("IsUpToDate: %v, LateInitializeVhost: %v\n", isUpToDate, isResourceLateInitialized)
+	fmt.Printf("Reconciling vhost: %v (IsUpToDate: %v, LateInitializeVhost: %v)\n", cr.Spec.ForProvider.HostName, isUpToDate, isResourceLateInitialized)
 
 	return managed.ExternalObservation{
 		// Return false when the external resource does not exist. This lets

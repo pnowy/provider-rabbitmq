@@ -104,11 +104,13 @@ dev-init: $(KIND) $(KUBECTL)
 	@$(KIND) create cluster --name=$(PROJECT_NAME)-dev
 	@$(KUBECTL) cluster-info --context kind-$(PROJECT_NAME)-dev
 	@$(INFO) Installing Crossplane CRDs
-	#@$(KUBECTL) apply --server-side -k https://github.com/crossplane/crossplane//cluster?ref=master
+	@helm dep update examples/helm/crossplane
+	@helm upgrade crossplane examples/helm/crossplane --install --namespace crossplane-system --create-namespace
+	@$(INFO) Installing RabbitMq
+	@helm dep update examples/helm/rabbitmq
+	@helm upgrade rabbitmq examples/helm/rabbitmq --install --namespace rabbitmq --create-namespace
 	@$(INFO) Installing Provider RabbitMq CRDs
 	@$(KUBECTL) apply -R -f package/crds
-	@$(INFO) Starting Provider RabbitMq controllers
-	@$(GO) run cmd/provider/main.go --debug
 
 dev-clean: $(KIND) $(KUBECTL)
 	@$(INFO) Deleting kind cluster
