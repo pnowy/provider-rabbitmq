@@ -18,7 +18,6 @@ package vhost
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 
@@ -42,6 +41,7 @@ import (
 	"github.com/pnowy/provider-rabbitmq/apis/core/v1alpha1"
 	apisv1alpha1 "github.com/pnowy/provider-rabbitmq/apis/v1alpha1"
 	"github.com/pnowy/provider-rabbitmq/internal/features"
+	"github.com/pnowy/provider-rabbitmq/internal/rabbitmqclient"
 )
 
 const (
@@ -53,33 +53,6 @@ const (
 	errGetCreds     = "cannot get credentials"
 
 	errNewClient = "cannot create new Service"
-)
-
-type RabbitMqService struct {
-	rmqc *rabbithole.Client
-}
-
-type RabbitMqCredentials struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
-	Endpoint string `json:"endpoint"`
-}
-
-var (
-	newRabbitMqService = func(creds []byte) (*RabbitMqService, error) {
-		var config = new(RabbitMqCredentials)
-		if err := json.Unmarshal(creds, &config); err != nil {
-			return nil, errors.Wrap(err, "failed to unmarshal credentials")
-		}
-		fmt.Printf("RabbitMq address: %s\n", config.Endpoint)
-		c, err := rabbithole.NewClient(config.Endpoint, config.Username, config.Password)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to create RabbitMQ client")
-		}
-		return &RabbitMqService{
-			rmqc: c,
-		}, err
-	}
 )
 
 // Setup adds a controller that reconciles Vhost managed resources.
@@ -96,7 +69,7 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 		managed.WithExternalConnecter(&connector{
 			kube:         mgr.GetClient(),
 			usage:        resource.NewProviderConfigUsageTracker(mgr.GetClient(), &apisv1alpha1.ProviderConfigUsage{}),
-			newServiceFn: newRabbitMqService}),
+			newServiceFn: rabbitmqclient.NewClient}),
 		managed.WithLogger(o.Logger.WithValues("controller", name)),
 		managed.WithPollInterval(o.PollInterval),
 		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name))),
@@ -115,7 +88,7 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 type connector struct {
 	kube         client.Client
 	usage        resource.Tracker
-	newServiceFn func(creds []byte) (*RabbitMqService, error)
+	newServiceFn func(creds []byte) (*rabbitmqclient.RabbitMqService, error)
 }
 
 // Connect typically produces an ExternalClient by:
@@ -157,7 +130,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 type external struct {
 	// A 'client' used to connect to the external resource API. In practice this
 	// would be something like an AWS SDK client.
-	service *RabbitMqService
+	service *rabbitmqclient.RabbitMqService
 }
 
 // GenerateVhostObservation is used to produce v1alpha1.GroupGitLabObservation from gitlab.Group.
@@ -242,7 +215,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	if !ok {
 		return managed.ExternalObservation{}, errors.New(errNotVhost)
 	}
-	rmqVhost, err := c.service.rmqc.GetVhost(cr.Spec.ForProvider.HostName)
+	rmqVhost, err := c.service.Rmqc.GetVhost(cr.Spec.ForProvider.HostName)
 	if err != nil {
 		var errResp rabbithole.ErrorResponse
 		if errors.As(err, &errResp) && errResp.StatusCode == http.StatusNotFound {
@@ -261,7 +234,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	cr.Status.SetConditions(xpv1.Available())
 
 	isUpToDate := isVhostUpToDate(&cr.Spec.ForProvider, rmqVhost)
-	fmt.Printf("IsUpToDate: %v, LateInitializeVhost: %v\n", isUpToDate, isResourceLateInitialized)
+	fmt.Printf("Reconciling vhost: %v (IsUpToDate: %v, LateInitializeVhost: %v)\n", cr.Spec.ForProvider.HostName, isUpToDate, isResourceLateInitialized)
 
 	return managed.ExternalObservation{
 		// Return false when the external resource does not exist. This lets
@@ -287,7 +260,7 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, errors.New(errNotVhost)
 	}
 	fmt.Printf("Creating vhost: %+v", cr.Spec.ForProvider.HostName)
-	resp, err := c.service.rmqc.PutVhost(cr.Spec.ForProvider.HostName, GenerateClientVhostOptions(cr.Spec.ForProvider.VhostSettings))
+	resp, err := c.service.Rmqc.PutVhost(cr.Spec.ForProvider.HostName, GenerateClientVhostOptions(cr.Spec.ForProvider.VhostSettings))
 	if err != nil {
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateFailed)
 	}
@@ -310,7 +283,7 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 
 	fmt.Printf("Updating vhost: %+v\n", cr.Spec.ForProvider.HostName)
 	options := GenerateClientVhostOptions(cr.Spec.ForProvider.VhostSettings)
-	resp, err := c.service.rmqc.PutVhost(cr.Spec.ForProvider.HostName, options)
+	resp, err := c.service.Rmqc.PutVhost(cr.Spec.ForProvider.HostName, options)
 	if err != nil {
 		return managed.ExternalUpdate{}, errors.Wrap(err, errCreateFailed)
 	}
@@ -331,7 +304,7 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalDelete{}, errors.New(errNotVhost)
 	}
 	fmt.Printf("Deleting vhost: %+v", cr.Spec.ForProvider.HostName)
-	resp, err := c.service.rmqc.DeleteVhost(cr.Spec.ForProvider.HostName)
+	resp, err := c.service.Rmqc.DeleteVhost(cr.Spec.ForProvider.HostName)
 	if err != nil {
 		fmt.Printf("Error deleting Vhost: %+v\n", err)
 		return managed.ExternalDelete{}, errors.Wrap(err, errCreateFailed)
