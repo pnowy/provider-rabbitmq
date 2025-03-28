@@ -6,20 +6,24 @@ metadata:
 apiVersion: v1
 kind: Secret
 metadata:
+  name: rabbitmq-credentials
   namespace: crossplane-system
-  name: example-provider-secret
-type: Opaque
-data:
-  # credentials: BASE64ENCODED_PROVIDER_CREDS
+stringData:
+  credentials: |
+    {
+      "username": "guest",
+      "password": "guest",
+      "endpoint": "http://rabbitmq.rabbitmq.svc.cluster.local:15672"
+    }
 ---
 apiVersion: rabbitmq.crossplane.io/v1alpha1
 kind: ProviderConfig
 metadata:
-  name: example
+  name: provider-rabbitmq
 spec:
   credentials:
     source: Secret
     secretRef:
+      name: rabbitmq-credentials
       namespace: crossplane-system
-      name: example-provider-secret
       key: credentials
