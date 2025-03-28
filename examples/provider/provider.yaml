@@ -1,0 +1,7 @@
+apiVersion: pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  name: provider-rabbitmq
+  namespace: crossplane-system
+spec:
+  package: ghcr.io/pnowy/provider-rabbitmq:v0.0.0-36.gb57720d
