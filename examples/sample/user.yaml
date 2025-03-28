@@ -1,0 +1,11 @@
+apiVersion: core.rabbitmq.crossplane.io/v1alpha1
+kind: User
+metadata:
+  name: demo
+spec:
+  forProvider:
+    username: demo
+    userSettings:
+      password: demo
+  providerConfigRef:
+    name: provider-rabbitmq
