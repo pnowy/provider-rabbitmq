@@ -19,14 +19,12 @@ package vhost
 import (
 	"context"
 	"fmt"
-	"net/http"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	rabbithole "github.com/michaelklishin/rabbit-hole/v3"
 	"github.com/pkg/errors"
-	"github.com/pnowy/provider-rabbitmq/apis"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -48,6 +46,7 @@ const (
 	errNotVhost     = "managed resource is not a Vhost custom resource"
 	errGetFailed    = "cannot get RabbitMq vhost"
 	errCreateFailed = "cannot create RabbitMq vhost"
+	errDeleteFailed = "cannot delete RabbitMq vhost"
 	errTrackPCUsage = "cannot track ProviderConfig usage"
 	errGetPC        = "cannot get ProviderConfig"
 	errGetCreds     = "cannot get credentials"
@@ -194,13 +193,13 @@ func lateInitializeVhost(spec *v1alpha1.VhostParameters, api *rabbithole.VhostIn
 
 func isVhostUpToDate(spec *v1alpha1.VhostParameters, api *rabbithole.VhostInfo) bool { //nolint:gocyclo
 	if spec.VhostSettings != nil {
-		if !apis.IsStringPtrEqualToString(spec.VhostSettings.Description, api.Description) {
+		if !rabbitmqclient.IsStringPtrEqualToString(spec.VhostSettings.Description, api.Description) {
 			return false
 		}
-		if !apis.IsStringPtrEqualToString(spec.VhostSettings.DefaultQueueType, api.DefaultQueueType) {
+		if !rabbitmqclient.IsStringPtrEqualToString(spec.VhostSettings.DefaultQueueType, api.DefaultQueueType) {
 			return false
 		}
-		if !apis.IsBoolPtrEqualToBool(spec.VhostSettings.Tracing, api.Tracing) {
+		if !rabbitmqclient.IsBoolPtrEqualToBool(spec.VhostSettings.Tracing, api.Tracing) {
 			return false
 		}
 		if !cmp.Equal([]string(spec.VhostSettings.Tags), []string(api.Tags), cmpopts.EquateEmpty()) {
@@ -217,8 +216,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}
 	rmqVhost, err := c.service.Rmqc.GetVhost(cr.Spec.ForProvider.HostName)
 	if err != nil {
-		var errResp rabbithole.ErrorResponse
-		if errors.As(err, &errResp) && errResp.StatusCode == http.StatusNotFound {
+		if rabbitmqclient.IsNotFoundError(err) {
 			return managed.ExternalObservation{
 				ResourceExists: false,
 			}, nil
@@ -307,7 +305,7 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 	resp, err := c.service.Rmqc.DeleteVhost(cr.Spec.ForProvider.HostName)
 	if err != nil {
 		fmt.Printf("Error deleting Vhost: %+v\n", err)
-		return managed.ExternalDelete{}, errors.Wrap(err, errCreateFailed)
+		return managed.ExternalDelete{}, errors.Wrap(err, errDeleteFailed)
 	}
 	if err := resp.Body.Close(); err != nil {
 		fmt.Printf("Error closing response body: %v\n", err)

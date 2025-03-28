@@ -27,8 +27,17 @@ import (
 
 // UserParameters are the configurable fields of a User.
 type UserParameters struct {
-	ConfigurableField string `json:"configurableField"`
+	ConfigurableField string        `json:"configurableField"`
+	Username          string        `json:"username"`
+	UserSettings      *UserSettings `json:"userSettings,omitempty"`
 }
+
+type UserSettings struct {
+	Password *string  `json:"password,omitempty"`
+	Tags     UserTags `json:"tags,omitempty"`
+}
+
+type UserTags []string
 
 // UserObservation are the observable fields of a User.
 type UserObservation struct {

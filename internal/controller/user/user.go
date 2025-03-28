@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	rabbithole "github.com/michaelklishin/rabbit-hole/v3"
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -40,9 +41,12 @@ import (
 
 const (
 	errNotUser      = "managed resource is not a User custom resource"
+	errGetFailed    = "cannot get RabbitMq User"
 	errTrackPCUsage = "cannot track ProviderConfig usage"
 	errGetPC        = "cannot get ProviderConfig"
 	errGetCreds     = "cannot get credentials"
+	errCreateFailed = "cannot create RabbitMq user"
+	errDeleteFailed = "cannot delete RabbitMq user"
 
 	errNewClient = "cannot create new Service"
 )
@@ -117,12 +121,8 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 	return &external{service: svc}, nil
 }
 
-// An ExternalClient observes, then either creates, updates, or deletes an
-// external resource to ensure it reflects the managed resource's desired state.
 type external struct {
-	// A 'client' used to connect to the external resource API. In practice this
-	// would be something like an AWS SDK client.
-	service interface{}
+	service *rabbitmqclient.RabbitMqService
 }
 
 func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
@@ -130,6 +130,17 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	if !ok {
 		return managed.ExternalObservation{}, errors.New(errNotUser)
 	}
+	user, err := c.service.Rmqc.GetUser(cr.Spec.ForProvider.Username)
+	if err != nil {
+		if rabbitmqclient.IsNotFoundError(err) {
+			return managed.ExternalObservation{
+				ResourceExists: false,
+			}, nil
+		}
+		return managed.ExternalObservation{}, errors.Wrap(err, errGetFailed)
+	}
+
+	fmt.Printf("RabbitMqVhost: %s\n", user)
 
 	// These fmt statements should be removed in the real implementation.
 	fmt.Printf("Observing: %+v", cr)
@@ -156,14 +167,33 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	if !ok {
 		return managed.ExternalCreation{}, errors.New(errNotUser)
 	}
-
-	fmt.Printf("Creating: %+v", cr)
+	fmt.Printf("Creating user: %+v", cr.Spec.ForProvider.Username)
+	resp, err := c.service.Rmqc.PutUser(cr.Spec.ForProvider.Username, GenerateClientUserSettings(cr.Spec.ForProvider.UserSettings))
+	if err != nil {
+		return managed.ExternalCreation{}, errors.Wrap(err, errCreateFailed)
+	}
+	if err := resp.Body.Close(); err != nil {
+		fmt.Printf("Error closing response body: %v\n", err)
+	}
 
 	return managed.ExternalCreation{
-		// Optionally return any details that may be required to connect to the
-		// external resource. These will be stored as the connection secret.
 		ConnectionDetails: managed.ConnectionDetails{},
 	}, nil
+}
+
+func GenerateClientUserSettings(spec *v1alpha1.UserSettings) rabbithole.UserSettings {
+	if spec == nil {
+		return rabbithole.UserSettings{}
+	}
+	settings := rabbithole.UserSettings{}
+	if spec.Password != nil {
+		settings.Password = *spec.Password
+	}
+	if len(spec.Tags) > 0 {
+		settings.Tags = make([]string, len(spec.Tags))
+		copy(settings.Tags, spec.Tags)
+	}
+	return settings
 }
 
 func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
@@ -186,9 +216,15 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 	if !ok {
 		return managed.ExternalDelete{}, errors.New(errNotUser)
 	}
-
-	fmt.Printf("Deleting: %+v", cr)
-
+	fmt.Printf("Deleting user: %+v", cr.Spec.ForProvider.Username)
+	resp, err := c.service.Rmqc.DeleteUser(cr.Spec.ForProvider.Username)
+	if err != nil {
+		fmt.Printf("Error deleting user: %+v\n", err)
+		return managed.ExternalDelete{}, errors.Wrap(err, errDeleteFailed)
+	}
+	if err := resp.Body.Close(); err != nil {
+		fmt.Printf("Error closing response body: %v\n", err)
+	}
 	return managed.ExternalDelete{}, nil
 }
 

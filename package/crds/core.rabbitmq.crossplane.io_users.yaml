@@ -75,8 +75,20 @@ spec:
                 properties:
                   configurableField:
                     type: string
+                  userSettings:
+                    properties:
+                      password:
+                        type: string
+                      tags:
+                        items:
+                          type: string
+                        type: array
+                    type: object
+                  username:
+                    type: string
                 required:
                 - configurableField
+                - username
                 type: object
               managementPolicies:
                 default:
