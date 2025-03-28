@@ -171,6 +171,12 @@ export CROSSPLANE_MAKE_HELP
 crossplane.help:
 	@echo "$$CROSSPLANE_MAKE_HELP"
 
+lint:
+	golangci-lint run
+
+lint-fix:
+	golangci-lint run --fix
+
 help-special: crossplane.help
 
-.PHONY: crossplane.help help-special
+.PHONY: crossplane.help help-special lint lint-fix

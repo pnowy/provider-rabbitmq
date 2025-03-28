@@ -3,6 +3,7 @@ package rabbitmqclient
 import (
 	"encoding/json"
 	"fmt"
+
 	rabbithole "github.com/michaelklishin/rabbit-hole/v3"
 	"github.com/pkg/errors"
 )
