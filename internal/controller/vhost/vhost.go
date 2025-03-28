@@ -124,89 +124,8 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 	return &external{service: svc}, nil
 }
 
-// An ExternalClient observes, then either creates, updates, or deletes an
-// external resource to ensure it reflects the managed resource's desired state.
 type external struct {
-	// A 'client' used to connect to the external resource API. In practice this
-	// would be something like an AWS SDK client.
 	service *rabbitmqclient.RabbitMqService
-}
-
-// GenerateVhostObservation is used to produce v1alpha1.GroupGitLabObservation from gitlab.Group.
-func GenerateVhostObservation(vh *rabbithole.VhostInfo) v1alpha1.VhostObservation {
-	if vh == nil {
-		return v1alpha1.VhostObservation{}
-	}
-	vhost := v1alpha1.VhostObservation{
-		Name:                   vh.Name,
-		Description:            &vh.Description,
-		DefaultQueueType:       &vh.DefaultQueueType,
-		Messages:               vh.Messages,
-		MessagesReady:          vh.MessagesReady,
-		MessagesUnacknowledged: vh.MessagesUnacknowledged,
-	}
-	return vhost
-}
-
-func GenerateClientVhostOptions(spec *v1alpha1.VhostSettings) rabbithole.VhostSettings {
-	if spec == nil {
-		return rabbithole.VhostSettings{}
-	}
-	settings := rabbithole.VhostSettings{}
-	if spec.DefaultQueueType != nil {
-		settings.DefaultQueueType = *spec.DefaultQueueType
-	}
-	if spec.Description != nil {
-		settings.Description = *spec.Description
-	}
-	if spec.Tracing != nil {
-		settings.Tracing = *spec.Tracing
-	}
-	if len(spec.Tags) > 0 {
-		settings.Tags = make([]string, len(spec.Tags))
-		copy(settings.Tags, spec.Tags)
-	}
-	return settings
-}
-
-func lateInitializeVhost(spec *v1alpha1.VhostParameters, api *rabbithole.VhostInfo) {
-	if api == nil {
-		return
-	}
-	if spec.VhostSettings == nil {
-		spec.VhostSettings = &v1alpha1.VhostSettings{}
-	}
-	if spec.VhostSettings.DefaultQueueType == nil {
-		spec.VhostSettings.DefaultQueueType = &api.DefaultQueueType
-	}
-	if spec.VhostSettings.Description == nil {
-		spec.VhostSettings.Description = &api.Description
-	}
-	if spec.VhostSettings.Tracing == nil {
-		spec.VhostSettings.Tracing = &api.Tracing
-	}
-	if len(api.Tags) > 0 && len(spec.VhostSettings.Tags) > 0 {
-		spec.VhostSettings.Tags = make([]string, len(api.Tags))
-		copy(spec.VhostSettings.Tags, api.Tags)
-	}
-}
-
-func isVhostUpToDate(spec *v1alpha1.VhostParameters, api *rabbithole.VhostInfo) bool { //nolint:gocyclo
-	if spec.VhostSettings != nil {
-		if !rabbitmqclient.IsStringPtrEqualToString(spec.VhostSettings.Description, api.Description) {
-			return false
-		}
-		if !rabbitmqclient.IsStringPtrEqualToString(spec.VhostSettings.DefaultQueueType, api.DefaultQueueType) {
-			return false
-		}
-		if !rabbitmqclient.IsBoolPtrEqualToBool(spec.VhostSettings.Tracing, api.Tracing) {
-			return false
-		}
-		if !cmp.Equal([]string(spec.VhostSettings.Tags), []string(api.Tags), cmpopts.EquateEmpty()) {
-			return false
-		}
-	}
-	return true
 }
 
 func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
@@ -315,4 +234,81 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 
 func (c *external) Disconnect(ctx context.Context) error {
 	return nil
+}
+
+// GenerateVhostObservation is used to produce v1alpha1.GroupGitLabObservation from gitlab.Group.
+func GenerateVhostObservation(vh *rabbithole.VhostInfo) v1alpha1.VhostObservation {
+	if vh == nil {
+		return v1alpha1.VhostObservation{}
+	}
+	vhost := v1alpha1.VhostObservation{
+		Name:                   vh.Name,
+		Description:            &vh.Description,
+		DefaultQueueType:       &vh.DefaultQueueType,
+		Messages:               vh.Messages,
+		MessagesReady:          vh.MessagesReady,
+		MessagesUnacknowledged: vh.MessagesUnacknowledged,
+	}
+	return vhost
+}
+
+func GenerateClientVhostOptions(spec *v1alpha1.VhostSettings) rabbithole.VhostSettings {
+	if spec == nil {
+		return rabbithole.VhostSettings{}
+	}
+	settings := rabbithole.VhostSettings{}
+	if spec.DefaultQueueType != nil {
+		settings.DefaultQueueType = *spec.DefaultQueueType
+	}
+	if spec.Description != nil {
+		settings.Description = *spec.Description
+	}
+	if spec.Tracing != nil {
+		settings.Tracing = *spec.Tracing
+	}
+	if len(spec.Tags) > 0 {
+		settings.Tags = make([]string, len(spec.Tags))
+		copy(settings.Tags, spec.Tags)
+	}
+	return settings
+}
+
+func lateInitializeVhost(spec *v1alpha1.VhostParameters, api *rabbithole.VhostInfo) {
+	if api == nil {
+		return
+	}
+	if spec.VhostSettings == nil {
+		spec.VhostSettings = &v1alpha1.VhostSettings{}
+	}
+	if spec.VhostSettings.DefaultQueueType == nil {
+		spec.VhostSettings.DefaultQueueType = &api.DefaultQueueType
+	}
+	if spec.VhostSettings.Description == nil {
+		spec.VhostSettings.Description = &api.Description
+	}
+	if spec.VhostSettings.Tracing == nil {
+		spec.VhostSettings.Tracing = &api.Tracing
+	}
+	if len(api.Tags) > 0 && len(spec.VhostSettings.Tags) > 0 {
+		spec.VhostSettings.Tags = make([]string, len(api.Tags))
+		copy(spec.VhostSettings.Tags, api.Tags)
+	}
+}
+
+func isVhostUpToDate(spec *v1alpha1.VhostParameters, api *rabbithole.VhostInfo) bool { //nolint:gocyclo
+	if spec.VhostSettings != nil {
+		if !rabbitmqclient.IsStringPtrEqualToString(spec.VhostSettings.Description, api.Description) {
+			return false
+		}
+		if !rabbitmqclient.IsStringPtrEqualToString(spec.VhostSettings.DefaultQueueType, api.DefaultQueueType) {
+			return false
+		}
+		if !rabbitmqclient.IsBoolPtrEqualToBool(spec.VhostSettings.Tracing, api.Tracing) {
+			return false
+		}
+		if !cmp.Equal([]string(spec.VhostSettings.Tags), []string(api.Tags), cmpopts.EquateEmpty()) {
+			return false
+		}
+	}
+	return true
 }

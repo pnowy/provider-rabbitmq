@@ -167,7 +167,7 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	}
 	fmt.Printf("Creating user: %+v", cr.Spec.ForProvider.Username)
 
-	// todo resolve user password
+	// TODO check if ok to keep password this way temporary
 	password, err := c.resolveUserPassword(ctx, cr.Spec.ForProvider.UserSettings)
 	if err != nil {
 		return managed.ExternalCreation{}, errors.Wrap(err, "cannot determine password")
@@ -184,45 +184,6 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	return managed.ExternalCreation{
 		ConnectionDetails: managed.ConnectionDetails{},
 	}, nil
-}
-
-func generateClientUserSettings(password *string, spec *v1alpha1.UserSettings) rabbithole.UserSettings {
-	if spec == nil {
-		return rabbithole.UserSettings{}
-	}
-	settings := rabbithole.UserSettings{}
-	if password != nil {
-		settings.Password = *password
-	}
-	if len(spec.Tags) > 0 {
-		settings.Tags = make([]string, len(spec.Tags))
-		copy(settings.Tags, spec.Tags)
-	}
-	return settings
-}
-
-func (c *external) resolveUserPassword(ctx context.Context, spec *v1alpha1.UserSettings) (string, error) {
-	// Direct password has precedence
-	if spec.Password != nil {
-		return *spec.Password, nil
-	}
-	// Try to resolve from secret reference
-	if ref := spec.PasswordSecretRef; ref != nil {
-		secret := &corev1.Secret{}
-		nn := types.NamespacedName{
-			Namespace: ref.Namespace,
-			Name:      ref.Name,
-		}
-		if err := c.kube.Get(ctx, nn, secret); err != nil {
-			return "", errors.Wrap(err, "cannot get password secret")
-		}
-		password, ok := secret.Data[ref.Key]
-		if !ok {
-			return "", errors.Errorf("secret %s has no key %s", ref.Name, ref.Key)
-		}
-		return string(password), nil
-	}
-	return "", nil
 }
 
 func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
@@ -259,4 +220,43 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 
 func (c *external) Disconnect(ctx context.Context) error {
 	return nil
+}
+
+func (c *external) resolveUserPassword(ctx context.Context, spec *v1alpha1.UserSettings) (string, error) {
+	// Direct password has precedence
+	if spec.Password != nil {
+		return *spec.Password, nil
+	}
+	// Try to resolve from secret reference
+	if ref := spec.PasswordSecretRef; ref != nil {
+		secret := &corev1.Secret{}
+		nn := types.NamespacedName{
+			Namespace: ref.Namespace,
+			Name:      ref.Name,
+		}
+		if err := c.kube.Get(ctx, nn, secret); err != nil {
+			return "", errors.Wrap(err, "cannot get password secret")
+		}
+		password, ok := secret.Data[ref.Key]
+		if !ok {
+			return "", errors.Errorf("secret %s has no key %s", ref.Name, ref.Key)
+		}
+		return string(password), nil
+	}
+	return "", nil
+}
+
+func generateClientUserSettings(password *string, spec *v1alpha1.UserSettings) rabbithole.UserSettings {
+	if spec == nil {
+		return rabbithole.UserSettings{}
+	}
+	settings := rabbithole.UserSettings{}
+	if password != nil {
+		settings.Password = *password
+	}
+	if len(spec.Tags) > 0 {
+		settings.Tags = make([]string, len(spec.Tags))
+		copy(settings.Tags, spec.Tags)
+	}
+	return settings
 }
