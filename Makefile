@@ -104,11 +104,11 @@ dev-init: $(KIND) $(KUBECTL)
 	@$(KIND) create cluster --name=$(PROJECT_NAME)-dev
 	@$(KUBECTL) cluster-info --context kind-$(PROJECT_NAME)-dev
 	@$(INFO) Installing Crossplane CRDs
-	@helm dep update examples/helm/crossplane
-	@helm upgrade crossplane examples/helm/crossplane --install --namespace crossplane-system --create-namespace
+	@helm dep update helm/crossplane
+	@helm upgrade crossplane helm/crossplane --install --namespace crossplane-system --create-namespace
 	@$(INFO) Installing RabbitMq
-	@helm dep update examples/helm/rabbitmq
-	@helm upgrade rabbitmq examples/helm/rabbitmq --install --namespace rabbitmq --create-namespace
+	@helm dep update helm/rabbitmq
+	@helm upgrade rabbitmq helm/rabbitmq --install --namespace rabbitmq --create-namespace
 	@$(INFO) Installing Provider RabbitMq CRDs
 	@$(KUBECTL) apply -R -f package/crds
 
@@ -171,10 +171,10 @@ export CROSSPLANE_MAKE_HELP
 crossplane.help:
 	@echo "$$CROSSPLANE_MAKE_HELP"
 
-lint:
+local.lint:
 	golangci-lint run
 
-lint-fix:
+local.lint-fix:
 	golangci-lint run --fix
 
 help-special: crossplane.help
