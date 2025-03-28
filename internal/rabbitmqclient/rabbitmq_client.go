@@ -2,7 +2,6 @@ package rabbitmqclient
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 
 	rabbithole "github.com/michaelklishin/rabbit-hole/v3"
@@ -24,7 +23,7 @@ func NewClient(creds []byte) (*RabbitMqService, error) {
 	if err := json.Unmarshal(creds, &config); err != nil {
 		return nil, errors.Wrap(err, "failed to unmarshal credentials")
 	}
-	fmt.Printf("RabbitMq address: %s\n", config.Endpoint)
+	//fmt.Printf("RabbitMq address: %s\n", config.Endpoint)
 	c, err := rabbithole.NewClient(config.Endpoint, config.Username, config.Password)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create RabbitMQ client")

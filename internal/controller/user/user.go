@@ -130,7 +130,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	if !ok {
 		return managed.ExternalObservation{}, errors.New(errNotUser)
 	}
-	user, err := c.service.Rmqc.GetUser(cr.Spec.ForProvider.Username)
+	_, err := c.service.Rmqc.GetUser(cr.Spec.ForProvider.Username)
 	if err != nil {
 		if rabbitmqclient.IsNotFoundError(err) {
 			return managed.ExternalObservation{
@@ -139,11 +139,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		}
 		return managed.ExternalObservation{}, errors.Wrap(err, errGetFailed)
 	}
-
-	fmt.Printf("RabbitMqVhost: %s\n", user)
-
-	// These fmt statements should be removed in the real implementation.
-	fmt.Printf("Observing: %+v", cr)
+	fmt.Printf("Reconciling user: %v\n", cr.Spec.ForProvider.Username)
 
 	return managed.ExternalObservation{
 		// Return false when the external resource does not exist. This lets
