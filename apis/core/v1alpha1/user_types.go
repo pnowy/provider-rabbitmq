@@ -32,8 +32,9 @@ type UserParameters struct {
 }
 
 type UserSettings struct {
-	Password *string  `json:"password,omitempty"`
-	Tags     UserTags `json:"tags,omitempty"`
+	Password          *string                 `json:"password,omitempty"`
+	PasswordSecretRef *xpv1.SecretKeySelector `json:"passwordSecretRef,omitempty"`
+	Tags              UserTags                `json:"tags,omitempty"`
 }
 
 type UserTags []string
