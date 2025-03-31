@@ -19,6 +19,7 @@ package user
 import (
 	"context"
 	"fmt"
+	"net/http"
 
 	rabbithole "github.com/michaelklishin/rabbit-hole/v3"
 	"github.com/pkg/errors"
@@ -167,14 +168,19 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	}
 	fmt.Printf("Creating user: %+v", cr.Spec.ForProvider.Username)
 
-	// TODO check if ok to keep password this way temporary
 	password, err := c.resolveUserPassword(ctx, cr.Spec.ForProvider.UserSettings)
 	if err != nil {
 		return managed.ExternalCreation{}, errors.Wrap(err, "cannot determine password")
 	}
 
-	resp, err := c.service.Rmqc.PutUser(cr.Spec.ForProvider.Username, generateClientUserSettings(&password, cr.Spec.ForProvider.UserSettings))
+	var resp *http.Response
+	if password != "" {
+		resp, err = c.service.Rmqc.PutUser(cr.Spec.ForProvider.Username, generateClientUserSettings(&password, cr.Spec.ForProvider.UserSettings))
+	} else {
+		resp, err = c.service.Rmqc.PutUserWithoutPassword(cr.Spec.ForProvider.Username, generateClientUserSettings(nil, cr.Spec.ForProvider.UserSettings))
+	}
 	if err != nil {
+		fmt.Printf("Error creating user: %v\n", err)
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateFailed)
 	}
 	if err := resp.Body.Close(); err != nil {
@@ -182,7 +188,9 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	}
 
 	return managed.ExternalCreation{
-		ConnectionDetails: managed.ConnectionDetails{},
+		ConnectionDetails: managed.ConnectionDetails{
+			"token": []byte("przemek-token"),
+		},
 	}, nil
 }
 
@@ -223,6 +231,10 @@ func (c *external) Disconnect(ctx context.Context) error {
 }
 
 func (c *external) resolveUserPassword(ctx context.Context, spec *v1alpha1.UserSettings) (string, error) {
+	// passwordless user
+	if spec == nil {
+		return "", nil
+	}
 	// Direct password has precedence
 	if spec.Password != nil {
 		return *spec.Password, nil
