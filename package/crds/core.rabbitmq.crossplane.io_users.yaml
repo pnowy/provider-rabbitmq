@@ -278,6 +278,12 @@ spec:
               atProvider:
                 description: UserObservation are the observable fields of a User.
                 properties:
+                  hashingAlgorithm:
+                    type: string
+                  tags:
+                    items:
+                      type: string
+                    type: array
                   username:
                     type: string
                 type: object

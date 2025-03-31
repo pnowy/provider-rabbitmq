@@ -6,6 +6,7 @@ spec:
   forProvider:
     username: demo
     userSettings:
-      password: demo
+      password: demo2
+      tags: ["administrator"]
   providerConfigRef:
     name: provider-rabbitmq

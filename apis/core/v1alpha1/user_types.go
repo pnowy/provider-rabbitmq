@@ -41,7 +41,9 @@ type UserTags []string
 
 // UserObservation are the observable fields of a User.
 type UserObservation struct {
-	Username string `json:"username,omitempty"`
+	Username         string   `json:"username,omitempty"`
+	HashingAlgorithm string   `json:"hashingAlgorithm,omitempty"`
+	Tags             UserTags `json:"tags,omitempty"`
 }
 
 // A UserSpec defines the desired state of a User.

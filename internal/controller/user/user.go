@@ -17,9 +17,17 @@ limitations under the License.
 package user
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
+	"crypto/sha512"
+	"encoding/base64"
 	"fmt"
 	"net/http"
+
+	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 
 	rabbithole "github.com/michaelklishin/rabbit-hole/v3"
 	"github.com/pkg/errors"
@@ -133,7 +141,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	if !ok {
 		return managed.ExternalObservation{}, errors.New(errNotUser)
 	}
-	_, err := c.service.Rmqc.GetUser(cr.Spec.ForProvider.Username)
+	apiUser, err := c.service.Rmqc.GetUser(cr.Spec.ForProvider.Username)
 	if err != nil {
 		if rabbitmqclient.IsNotFoundError(err) {
 			return managed.ExternalObservation{
@@ -142,22 +150,25 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		}
 		return managed.ExternalObservation{}, errors.Wrap(err, errGetFailed)
 	}
-	fmt.Printf("Reconciling user: %v\n", cr.Spec.ForProvider.Username)
+	current := cr.Spec.ForProvider.DeepCopy()
+	lateInitialize(&cr.Spec.ForProvider, apiUser)
+	isResourceLateInitialized := !cmp.Equal(current, &cr.Spec.ForProvider)
+
+	cr.Status.AtProvider = GenerateUserObservation(apiUser)
+	cr.Status.SetConditions(xpv1.Available())
+
+	password, err := c.resolveUserPassword(ctx, cr.Spec.ForProvider.UserSettings)
+	if err != nil {
+		return managed.ExternalObservation{}, errors.Wrap(err, "cannot resolve password")
+	}
+	isUpToDate := isUpToDate(password, &cr.Spec.ForProvider, apiUser)
+	fmt.Printf("Reconciling user: %v (upToDate: %v, lateInitilize: %v)\n", cr.Spec.ForProvider.Username, isUpToDate, isResourceLateInitialized)
 
 	return managed.ExternalObservation{
-		// Return false when the external resource does not exist. This lets
-		// the managed resource reconciler know that it needs to call Create to
-		// (re)create the resource, or that it has successfully been deleted.
-		ResourceExists: true,
-
-		// Return false when the external resource exists, but it not up to date
-		// with the desired managed resource state. This lets the managed
-		// resource reconciler know that it needs to call Update.
-		ResourceUpToDate: true,
-
-		// Return any details that may be required to connect to the external
-		// resource. These will be stored as the connection secret.
-		ConnectionDetails: managed.ConnectionDetails{},
+		ResourceExists:          true,
+		ResourceUpToDate:        isUpToDate,
+		ResourceLateInitialized: isResourceLateInitialized,
+		ConnectionDetails:       managed.ConnectionDetails{},
 	}, nil
 }
 
@@ -166,7 +177,7 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	if !ok {
 		return managed.ExternalCreation{}, errors.New(errNotUser)
 	}
-	fmt.Printf("Creating user: %+v", cr.Spec.ForProvider.Username)
+	fmt.Printf("Creating user: %+v\n", cr.Spec.ForProvider.Username)
 
 	password, err := c.resolveUserPassword(ctx, cr.Spec.ForProvider.UserSettings)
 	if err != nil {
@@ -175,14 +186,14 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 
 	var resp *http.Response
 	if password != "" {
-		resp, err = c.service.Rmqc.PutUser(cr.Spec.ForProvider.Username, generateClientUserSettings(&password, cr.Spec.ForProvider.UserSettings))
+		resp, err = c.service.Rmqc.PutUser(cr.Spec.ForProvider.Username, generateApiUserSettings(&password, cr.Spec.ForProvider.UserSettings))
 		if resp != nil {
 			if err := resp.Body.Close(); err != nil {
 				fmt.Printf("Error closing response body: %v\n", err)
 			}
 		}
 	} else {
-		resp, err = c.service.Rmqc.PutUserWithoutPassword(cr.Spec.ForProvider.Username, generateClientUserSettings(nil, cr.Spec.ForProvider.UserSettings))
+		resp, err = c.service.Rmqc.PutUserWithoutPassword(cr.Spec.ForProvider.Username, generateApiUserSettings(nil, cr.Spec.ForProvider.UserSettings))
 		if resp != nil {
 			if err := resp.Body.Close(); err != nil {
 				fmt.Printf("Error closing response body: %v\n", err)
@@ -194,11 +205,7 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateFailed)
 	}
 
-	return managed.ExternalCreation{
-		ConnectionDetails: managed.ConnectionDetails{
-			"token": []byte("przemek-token"),
-		},
-	}, nil
+	return managed.ExternalCreation{}, nil
 }
 
 func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
@@ -206,12 +213,31 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 	if !ok {
 		return managed.ExternalUpdate{}, errors.New(errNotUser)
 	}
-
-	fmt.Printf("Updating: %+v", cr)
-
+	fmt.Printf("Updating user: %+v\n", cr.Spec.ForProvider.Username)
+	password, err := c.resolveUserPassword(ctx, cr.Spec.ForProvider.UserSettings)
+	if err != nil {
+		return managed.ExternalUpdate{}, errors.Wrap(err, "cannot determine password")
+	}
+	var resp *http.Response
+	if password != "" {
+		resp, err = c.service.Rmqc.PutUser(cr.Spec.ForProvider.Username, generateApiUserSettings(&password, cr.Spec.ForProvider.UserSettings))
+		if resp != nil {
+			if err := resp.Body.Close(); err != nil {
+				fmt.Printf("Error closing response body: %v\n", err)
+			}
+		}
+	} else {
+		resp, err = c.service.Rmqc.PutUserWithoutPassword(cr.Spec.ForProvider.Username, generateApiUserSettings(nil, cr.Spec.ForProvider.UserSettings))
+		if resp != nil {
+			if err := resp.Body.Close(); err != nil {
+				fmt.Printf("Error closing response body: %v\n", err)
+			}
+		}
+	}
+	if err != nil {
+		return managed.ExternalUpdate{}, errors.Wrap(err, errCreateFailed)
+	}
 	return managed.ExternalUpdate{
-		// Optionally return any details that may be required to connect to the
-		// external resource. These will be stored as the connection secret.
 		ConnectionDetails: managed.ConnectionDetails{},
 	}, nil
 }
@@ -265,7 +291,7 @@ func (c *external) resolveUserPassword(ctx context.Context, spec *v1alpha1.UserS
 	return "", nil
 }
 
-func generateClientUserSettings(password *string, spec *v1alpha1.UserSettings) rabbithole.UserSettings {
+func generateApiUserSettings(password *string, spec *v1alpha1.UserSettings) rabbithole.UserSettings {
 	if spec == nil {
 		return rabbithole.UserSettings{}
 	}
@@ -278,4 +304,86 @@ func generateClientUserSettings(password *string, spec *v1alpha1.UserSettings) r
 		copy(settings.Tags, spec.Tags)
 	}
 	return settings
+}
+
+func lateInitialize(spec *v1alpha1.UserParameters, api *rabbithole.UserInfo) {
+	if api == nil {
+		return
+	}
+	if spec.UserSettings == nil {
+		spec.UserSettings = &v1alpha1.UserSettings{}
+	}
+	if len(api.Tags) > 0 && len(spec.UserSettings.Tags) > 0 {
+		spec.UserSettings.Tags = make([]string, len(api.Tags))
+		copy(spec.UserSettings.Tags, api.Tags)
+	}
+}
+
+func GenerateUserObservation(apiUser *rabbithole.UserInfo) v1alpha1.UserObservation {
+	if apiUser == nil {
+		return v1alpha1.UserObservation{}
+	}
+	user := v1alpha1.UserObservation{
+		Username:         apiUser.Name,
+		HashingAlgorithm: string(apiUser.HashingAlgorithm),
+	}
+	if len(apiUser.Tags) > 0 {
+		user.Tags = make([]string, len(apiUser.Tags))
+		copy(user.Tags, apiUser.Tags)
+	}
+	return user
+}
+
+func isUpToDate(password string, spec *v1alpha1.UserParameters, api *rabbithole.UserInfo) bool { //nolint:gocyclo
+	if password != "" && api.PasswordHash != "" {
+		if api.HashingAlgorithm == rabbithole.HashingAlgorithmSHA256 {
+			if !isPasswordUpToDateSHA256(password, api.PasswordHash) {
+				return false
+			}
+		}
+		if api.HashingAlgorithm == rabbithole.HashingAlgorithmSHA512 {
+			if !isPasswordUpToDateSHA512(password, api.PasswordHash) {
+				return false
+			}
+		}
+	}
+	if spec.UserSettings != nil {
+		if !cmp.Equal([]string(spec.UserSettings.Tags), []string(api.Tags), cmpopts.EquateEmpty()) {
+			return false
+		}
+	}
+	return true
+}
+
+func isPasswordUpToDateSHA256(password, storedBase64Hash string) bool {
+	decoded, err := base64.StdEncoding.DecodeString(storedBase64Hash)
+	if err != nil {
+		return false
+	}
+
+	// Extract salt (first 4 characters)
+	if len(decoded) < 4 {
+		return false
+	}
+	salt := string(decoded[:4])
+	expectedHash := sha256.Sum256([]byte(salt + password))
+
+	// Compare expected hash with stored hash
+	return bytes.Equal(decoded[4:], expectedHash[:])
+}
+
+func isPasswordUpToDateSHA512(password, storedBase64Hash string) bool {
+	decoded, err := base64.StdEncoding.DecodeString(storedBase64Hash)
+	if err != nil {
+		return false
+	}
+
+	// Extract salt (first 4 characters)
+	if len(decoded) < 4 {
+		return false
+	}
+	salt := string(decoded[:4])
+	expectedHash := sha512.Sum512([]byte(salt + password))
+
+	return bytes.Equal(decoded[4:], expectedHash[:])
 }

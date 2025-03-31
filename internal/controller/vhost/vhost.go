@@ -147,7 +147,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	lateInitializeVhost(&cr.Spec.ForProvider, rmqVhost)
 	isResourceLateInitialized := !cmp.Equal(current, &cr.Spec.ForProvider)
 
-	cr.Status.AtProvider = GenerateVhostObservation(rmqVhost)
+	cr.Status.AtProvider = generateVhostObservation(rmqVhost)
 	cr.Status.SetConditions(xpv1.Available())
 
 	isUpToDate := isVhostUpToDate(&cr.Spec.ForProvider, rmqVhost)
@@ -177,7 +177,7 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, errors.New(errNotVhost)
 	}
 	fmt.Printf("Creating vhost: %+v", cr.Spec.ForProvider.HostName)
-	resp, err := c.service.Rmqc.PutVhost(cr.Spec.ForProvider.HostName, GenerateClientVhostOptions(cr.Spec.ForProvider.VhostSettings))
+	resp, err := c.service.Rmqc.PutVhost(cr.Spec.ForProvider.HostName, generateApiVhostSettings(cr.Spec.ForProvider.VhostSettings))
 	if err != nil {
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateFailed)
 	}
@@ -199,7 +199,7 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 	}
 
 	fmt.Printf("Updating vhost: %+v\n", cr.Spec.ForProvider.HostName)
-	options := GenerateClientVhostOptions(cr.Spec.ForProvider.VhostSettings)
+	options := generateApiVhostSettings(cr.Spec.ForProvider.VhostSettings)
 	resp, err := c.service.Rmqc.PutVhost(cr.Spec.ForProvider.HostName, options)
 	if err != nil {
 		return managed.ExternalUpdate{}, errors.Wrap(err, errCreateFailed)
@@ -236,8 +236,8 @@ func (c *external) Disconnect(ctx context.Context) error {
 	return nil
 }
 
-// GenerateVhostObservation is used to produce v1alpha1.GroupGitLabObservation from gitlab.Group.
-func GenerateVhostObservation(vh *rabbithole.VhostInfo) v1alpha1.VhostObservation {
+// generateVhostObservation is used to produce v1alpha1.GroupGitLabObservation from gitlab.Group.
+func generateVhostObservation(vh *rabbithole.VhostInfo) v1alpha1.VhostObservation {
 	if vh == nil {
 		return v1alpha1.VhostObservation{}
 	}
@@ -252,7 +252,7 @@ func GenerateVhostObservation(vh *rabbithole.VhostInfo) v1alpha1.VhostObservatio
 	return vhost
 }
 
-func GenerateClientVhostOptions(spec *v1alpha1.VhostSettings) rabbithole.VhostSettings {
+func generateApiVhostSettings(spec *v1alpha1.VhostSettings) rabbithole.VhostSettings {
 	if spec == nil {
 		return rabbithole.VhostSettings{}
 	}
