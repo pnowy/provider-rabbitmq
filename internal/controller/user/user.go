@@ -176,15 +176,22 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	var resp *http.Response
 	if password != "" {
 		resp, err = c.service.Rmqc.PutUser(cr.Spec.ForProvider.Username, generateClientUserSettings(&password, cr.Spec.ForProvider.UserSettings))
+		if resp != nil {
+			if err := resp.Body.Close(); err != nil {
+				fmt.Printf("Error closing response body: %v\n", err)
+			}
+		}
 	} else {
 		resp, err = c.service.Rmqc.PutUserWithoutPassword(cr.Spec.ForProvider.Username, generateClientUserSettings(nil, cr.Spec.ForProvider.UserSettings))
+		if resp != nil {
+			if err := resp.Body.Close(); err != nil {
+				fmt.Printf("Error closing response body: %v\n", err)
+			}
+		}
 	}
 	if err != nil {
 		fmt.Printf("Error creating user: %v\n", err)
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateFailed)
-	}
-	if err := resp.Body.Close(); err != nil {
-		fmt.Printf("Error closing response body: %v\n", err)
 	}
 
 	return managed.ExternalCreation{
