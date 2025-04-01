@@ -21,6 +21,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/pnowy/provider-rabbitmq/internal/controller/config"
+	"github.com/pnowy/provider-rabbitmq/internal/controller/user"
 	"github.com/pnowy/provider-rabbitmq/internal/controller/vhost"
 )
 
@@ -30,6 +31,7 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 	for _, setup := range []func(ctrl.Manager, controller.Options) error{
 		config.Setup,
 		vhost.Setup,
+		user.Setup,
 	} {
 		if err := setup(mgr, o); err != nil {
 			return err
