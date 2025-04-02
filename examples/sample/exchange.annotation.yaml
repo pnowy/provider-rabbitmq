@@ -8,7 +8,7 @@ spec:
   forProvider:
     vhost: demo
     exchange_settings:
-      type: fanout
+      type: direct
       durable: false
       auto_delete: true
   providerConfigRef:

@@ -52,13 +52,6 @@ const (
 	errUpdateFailed = "cannot update Exchange"
 )
 
-// A NoOpService does nothing.
-type NoOpService struct{}
-
-var (
-	newNoOpService = func(_ []byte) (interface{}, error) { return &NoOpService{}, nil }
-)
-
 // Setup adds a controller that reconciles Exchange managed resources.
 func Setup(mgr ctrl.Manager, o controller.Options) error {
 	name := managed.ControllerName(v1alpha1.ExchangeGroupKind)
@@ -271,6 +264,7 @@ func GenerateExchangeObservation(api *rabbithole.DetailedExchangeInfo) v1alpha1.
 func GenerateExchangeOptions(spec *v1alpha1.ExchangeSettings) rabbithole.ExchangeSettings {
 	if spec == nil {
 		settings := rabbithole.ExchangeSettings{}
+		// Default value (Type is required in rabbitMq api)
 		settings.Type = "fanout"
 		return settings
 	}
@@ -278,6 +272,7 @@ func GenerateExchangeOptions(spec *v1alpha1.ExchangeSettings) rabbithole.Exchang
 	if spec.Type != nil {
 		settings.Type = *spec.Type
 	} else {
+		// Default value (Type is required in rabbitMq api)
 		settings.Type = "fanout"
 	}
 
