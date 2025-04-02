@@ -252,6 +252,7 @@ func GenerateExchangeObservation(api *rabbithole.DetailedExchangeInfo) v1alpha1.
 		return v1alpha1.ExchangeObservation{}
 	}
 	exchange := v1alpha1.ExchangeObservation{
+		Name:       api.Name,
 		Vhost:      api.Vhost,
 		Type:       api.Type,
 		Durable:    api.Durable,
