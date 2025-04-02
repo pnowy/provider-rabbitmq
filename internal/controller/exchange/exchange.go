@@ -125,7 +125,6 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 // An ExternalClient observes, then either creates, updates, or deletes an
 // external resource to ensure it reflects the managed resource's desired state.
 type external struct {
-	kube    client.Client
 	service *rabbitmqclient.RabbitMqService
 }
 
