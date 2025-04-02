@@ -27,6 +27,7 @@ import (
 
 // ExchangeParameters are the configurable fields of a Exchange.
 type ExchangeParameters struct {
+	Name             string            `json:"name,omitempty"`
 	Vhost            string            `json:"vhost"`
 	ExchangeSettings *ExchangeSettings `json:"exchange_settings,omitempty"`
 }
@@ -39,6 +40,7 @@ type ExchangeSettings struct {
 
 // ExchangeObservation are the observable fields of a Exchange.
 type ExchangeObservation struct {
+	Name       string `json:"name,omitempty"`
 	Vhost      string `json:"vhost,omitempty"`
 	Type       string `json:"type,omitempty"`
 	Durable    bool   `json:"durable,omitempty"`

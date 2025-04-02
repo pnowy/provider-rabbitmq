@@ -2,10 +2,9 @@ apiVersion: core.rabbitmq.crossplane.io/v1alpha1
 kind: Exchange
 metadata:
   name: myexchange-2
-  annotations:
-    crossplane.io/external-name: crossplane-exchange
 spec:
   forProvider:
+    name: crossplane-exchange
     vhost: demo
     exchange_settings:
       type: direct

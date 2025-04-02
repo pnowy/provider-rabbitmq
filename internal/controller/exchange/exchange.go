@@ -135,7 +135,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errNotExchange)
 	}
 
-	exchangeName := getName(cr.Annotations, cr.Name)
+	exchangeName := getName(&cr.Spec.ForProvider, cr.Name)
 	fmt.Printf("Observing exchange: %+v\n", exchangeName)
 	apiExchange, err := c.service.Rmqc.GetExchange(cr.Spec.ForProvider.Vhost, exchangeName)
 
@@ -170,7 +170,7 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	if !ok {
 		return managed.ExternalCreation{}, errors.New(errNotExchange)
 	}
-	exchangeName := getName(cr.Annotations, cr.Name)
+	exchangeName := getName(&cr.Spec.ForProvider, cr.Name)
 	fmt.Printf("Creating exchange: %+v\n", exchangeName)
 
 	resp, err := c.service.Rmqc.DeclareExchange(cr.Spec.ForProvider.Vhost, exchangeName, GenerateExchangeOptions(cr.Spec.ForProvider.ExchangeSettings))
@@ -195,7 +195,7 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalUpdate{}, errors.New(errNotExchange)
 	}
 
-	exchangeName := getName(cr.Annotations, cr.Name)
+	exchangeName := getName(&cr.Spec.ForProvider, cr.Name)
 	fmt.Printf("Updating exchange: %+v\n", exchangeName)
 
 	resp, err := c.service.Rmqc.DeclareExchange(cr.Spec.ForProvider.Vhost, exchangeName, GenerateExchangeOptions(cr.Spec.ForProvider.ExchangeSettings))
@@ -220,7 +220,7 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalDelete{}, errors.New(errNotExchange)
 	}
 
-	exchangeName := getName(cr.Annotations, cr.Name)
+	exchangeName := getName(&cr.Spec.ForProvider, cr.Name)
 	fmt.Printf("Deleting exchange: %+v\n", exchangeName)
 	resp, err := c.service.Rmqc.DeleteExchange(cr.Spec.ForProvider.Vhost, exchangeName)
 
@@ -301,10 +301,9 @@ func isUpToDate(spec *v1alpha1.ExchangeParameters, api *rabbithole.DetailedExcha
 	return true
 }
 
-func getName(annotations map[string]string, objectName string) string {
-	value, exists := annotations["crossplane.io/external-name"]
-	if exists {
-		return value
+func getName(spec *v1alpha1.ExchangeParameters, objectName string) string {
+	if spec.Name == "" {
+		return objectName
 	}
-	return objectName
+	return spec.Name
 }

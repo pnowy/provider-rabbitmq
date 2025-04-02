@@ -82,6 +82,8 @@ spec:
                       type:
                         type: string
                     type: object
+                  name:
+                    type: string
                   vhost:
                     type: string
                 required:
@@ -264,6 +266,8 @@ spec:
                     type: boolean
                   durable:
                     type: boolean
+                  name:
+                    type: string
                   type:
                     type: string
                   vhost:
