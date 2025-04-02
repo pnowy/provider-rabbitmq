@@ -10,4 +10,4 @@ spec:
       durable: false
       auto_delete: true
   providerConfigRef:
-    name: yoel
+    name: provider-rabbitmq
