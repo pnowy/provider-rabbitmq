@@ -73,10 +73,19 @@ spec:
               forProvider:
                 description: ExchangeParameters are the configurable fields of a Exchange.
                 properties:
-                  configurableField:
+                  exchange_settings:
+                    properties:
+                      auto_delete:
+                        type: boolean
+                      durable:
+                        type: boolean
+                      type:
+                        type: string
+                    type: object
+                  vhost:
                     type: string
                 required:
-                - configurableField
+                - vhost
                 type: object
               managementPolicies:
                 default:
@@ -251,7 +260,13 @@ spec:
               atProvider:
                 description: ExchangeObservation are the observable fields of a Exchange.
                 properties:
-                  observableField:
+                  auto_delete:
+                    type: boolean
+                  durable:
+                    type: boolean
+                  type:
+                    type: string
+                  vhost:
                     type: string
                 type: object
               conditions:

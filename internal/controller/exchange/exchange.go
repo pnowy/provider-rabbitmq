@@ -19,8 +19,11 @@ package exchange
 import (
 	"context"
 	"fmt"
-
+	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	"github.com/google/go-cmp/cmp"
+	rabbithole "github.com/michaelklishin/rabbit-hole/v3"
 	"github.com/pkg/errors"
+	"github.com/pnowy/provider-rabbitmq/internal/rabbitmqclient"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -42,8 +45,11 @@ const (
 	errTrackPCUsage = "cannot track ProviderConfig usage"
 	errGetPC        = "cannot get ProviderConfig"
 	errGetCreds     = "cannot get credentials"
-
-	errNewClient = "cannot create new Service"
+	errGetFailed    = "cannot get RabbitMq Exchange"
+	errNewClient    = "cannot create new Service"
+	errCreateFailed = "cannot create new Exchange"
+	errDeleteFailed = "cannot delete Exchange"
+	errUpdateFailed = "cannot update Exchange"
 )
 
 // A NoOpService does nothing.
@@ -67,7 +73,7 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 		managed.WithExternalConnecter(&connector{
 			kube:         mgr.GetClient(),
 			usage:        resource.NewProviderConfigUsageTracker(mgr.GetClient(), &apisv1alpha1.ProviderConfigUsage{}),
-			newServiceFn: newNoOpService}),
+			newServiceFn: rabbitmqclient.NewClient}),
 		managed.WithLogger(o.Logger.WithValues("controller", name)),
 		managed.WithPollInterval(o.PollInterval),
 		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name))),
@@ -86,7 +92,7 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 type connector struct {
 	kube         client.Client
 	usage        resource.Tracker
-	newServiceFn func(creds []byte) (interface{}, error)
+	newServiceFn func(creds []byte) (*rabbitmqclient.RabbitMqService, error)
 }
 
 // Connect typically produces an ExternalClient by:
@@ -126,9 +132,8 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 // An ExternalClient observes, then either creates, updates, or deletes an
 // external resource to ensure it reflects the managed resource's desired state.
 type external struct {
-	// A 'client' used to connect to the external resource API. In practice this
-	// would be something like an AWS SDK client.
-	service interface{}
+	kube    client.Client
+	service *rabbitmqclient.RabbitMqService
 }
 
 func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
@@ -137,23 +142,33 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errNotExchange)
 	}
 
-	// These fmt statements should be removed in the real implementation.
-	fmt.Printf("Observing: %+v", cr)
+	exchangeName := getName(cr.Annotations, cr.Name)
+	fmt.Printf("Observing exchange: %+v\n", exchangeName)
+	apiExchange, err := c.service.Rmqc.GetExchange(cr.Spec.ForProvider.Vhost, exchangeName)
+
+	if err != nil {
+		if rabbitmqclient.IsNotFoundError(err) {
+			return managed.ExternalObservation{
+				ResourceExists: false,
+			}, nil
+		}
+		return managed.ExternalObservation{}, errors.Wrap(err, errGetFailed)
+	}
+	current := cr.Spec.ForProvider.DeepCopy()
+	lateInitialize(&cr.Spec.ForProvider, apiExchange)
+	isResourceLateInitialized := !cmp.Equal(current, &cr.Spec.ForProvider)
+	cr.Status.AtProvider = GenerateExchangeObservation(apiExchange)
+	cr.Status.SetConditions(xpv1.Available())
+
+	isExchangeUptoDate := isUpToDate(&cr.Spec.ForProvider, apiExchange)
+
+	fmt.Printf("Reconciling exchange: %v (IsUpToDate: %v, LateInitializeVhost: %v)\n", exchangeName, isExchangeUptoDate, isResourceLateInitialized)
 
 	return managed.ExternalObservation{
-		// Return false when the external resource does not exist. This lets
-		// the managed resource reconciler know that it needs to call Create to
-		// (re)create the resource, or that it has successfully been deleted.
-		ResourceExists: true,
-
-		// Return false when the external resource exists, but it not up to date
-		// with the desired managed resource state. This lets the managed
-		// resource reconciler know that it needs to call Update.
-		ResourceUpToDate: true,
-
-		// Return any details that may be required to connect to the external
-		// resource. These will be stored as the connection secret.
-		ConnectionDetails: managed.ConnectionDetails{},
+		ResourceExists:          true,
+		ResourceUpToDate:        isExchangeUptoDate,
+		ResourceLateInitialized: isResourceLateInitialized,
+		ConnectionDetails:       managed.ConnectionDetails{},
 	}, nil
 }
 
@@ -162,8 +177,17 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	if !ok {
 		return managed.ExternalCreation{}, errors.New(errNotExchange)
 	}
+	exchangeName := getName(cr.Annotations, cr.Name)
+	fmt.Printf("Creating exchange: %+v\n", exchangeName)
 
-	fmt.Printf("Creating: %+v", cr)
+	resp, err := c.service.Rmqc.DeclareExchange(cr.Spec.ForProvider.Vhost, exchangeName, GenerateExchangeOptions(cr.Spec.ForProvider.ExchangeSettings))
+
+	if err != nil {
+		return managed.ExternalCreation{}, errors.Wrap(err, errCreateFailed)
+	}
+	if err := resp.Body.Close(); err != nil {
+		fmt.Printf("Error closing response body: %v\n", err)
+	}
 
 	return managed.ExternalCreation{
 		// Optionally return any details that may be required to connect to the
@@ -178,7 +202,17 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalUpdate{}, errors.New(errNotExchange)
 	}
 
-	fmt.Printf("Updating: %+v", cr)
+	exchangeName := getName(cr.Annotations, cr.Name)
+	fmt.Printf("Updating exchange: %+v\n", exchangeName)
+
+	resp, err := c.service.Rmqc.DeclareExchange(cr.Spec.ForProvider.Vhost, exchangeName, GenerateExchangeOptions(cr.Spec.ForProvider.ExchangeSettings))
+
+	if err != nil {
+		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdateFailed)
+	}
+	if err := resp.Body.Close(); err != nil {
+		fmt.Printf("Error closing response body: %v\n", err)
+	}
 
 	return managed.ExternalUpdate{
 		// Optionally return any details that may be required to connect to the
@@ -193,11 +227,89 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalDelete{}, errors.New(errNotExchange)
 	}
 
-	fmt.Printf("Deleting: %+v", cr)
+	exchangeName := getName(cr.Annotations, cr.Name)
+	fmt.Printf("Deleting exchange: %+v\n", exchangeName)
+	resp, err := c.service.Rmqc.DeleteExchange(cr.Spec.ForProvider.Vhost, exchangeName)
 
+	if err != nil {
+		fmt.Printf("Error deleting Exchange: %+v\n", err)
+		return managed.ExternalDelete{}, errors.Wrap(err, errDeleteFailed)
+	}
+	if err := resp.Body.Close(); err != nil {
+		fmt.Printf("Error closing response body: %v\n", err)
+	}
 	return managed.ExternalDelete{}, nil
 }
 
 func (c *external) Disconnect(ctx context.Context) error {
 	return nil
+}
+
+func lateInitialize(spec *v1alpha1.ExchangeParameters, api *rabbithole.DetailedExchangeInfo) {
+	if api == nil {
+		return
+	}
+	if spec.ExchangeSettings == nil {
+		spec.ExchangeSettings = &v1alpha1.ExchangeSettings{}
+	}
+}
+
+func GenerateExchangeObservation(api *rabbithole.DetailedExchangeInfo) v1alpha1.ExchangeObservation {
+	if api == nil {
+		return v1alpha1.ExchangeObservation{}
+	}
+	exchange := v1alpha1.ExchangeObservation{
+		Vhost:      api.Vhost,
+		Type:       api.Type,
+		Durable:    api.Durable,
+		AutoDelete: api.AutoDelete,
+	}
+
+	return exchange
+}
+
+func GenerateExchangeOptions(spec *v1alpha1.ExchangeSettings) rabbithole.ExchangeSettings {
+	if spec == nil {
+		settings := rabbithole.ExchangeSettings{}
+		settings.Type = "fanout"
+		return settings
+	}
+	settings := rabbithole.ExchangeSettings{}
+	if spec.Type != nil {
+		settings.Type = *spec.Type
+	} else {
+		settings.Type = "fanout"
+	}
+
+	if spec.Durable != nil {
+		settings.Durable = *spec.Durable
+	}
+
+	if spec.AutoDelete != nil {
+		settings.AutoDelete = *spec.AutoDelete
+	}
+	return settings
+}
+
+func isUpToDate(spec *v1alpha1.ExchangeParameters, api *rabbithole.DetailedExchangeInfo) bool { //nolint:gocyclo
+	if spec.ExchangeSettings != nil {
+		if !rabbitmqclient.IsStringPtrEqualToString(spec.ExchangeSettings.Type, api.Type) {
+			return false
+		}
+		if !rabbitmqclient.IsBoolPtrEqualToBool(spec.ExchangeSettings.Durable, api.Durable) {
+			return false
+		}
+		if !rabbitmqclient.IsBoolPtrEqualToBool(spec.ExchangeSettings.AutoDelete, api.AutoDelete) {
+			return false
+		}
+	}
+	return true
+}
+
+func getName(annotations map[string]string, objectName string) string {
+	value, exists := annotations["crossplane.io/external-name"]
+	if exists {
+		return value
+	}
+	return objectName
 }

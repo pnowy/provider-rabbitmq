@@ -19,7 +19,6 @@ package v1alpha1
 
 import xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 
-
 // GetCondition of this Exchange.
 func (mg *Exchange) GetCondition(ct xpv1.ConditionType) xpv1.Condition {
 	return mg.Status.GetCondition(ct)
@@ -78,31 +77,6 @@ func (mg *Exchange) SetPublishConnectionDetailsTo(r *xpv1.PublishConnectionDetai
 // SetWriteConnectionSecretToReference of this Exchange.
 func (mg *Exchange) SetWriteConnectionSecretToReference(r *xpv1.SecretReference) {
 	mg.Spec.WriteConnectionSecretToReference = r
-}
-
-// GetCondition of this Vhost.
-func (mg *Vhost) GetCondition(ct xpv1.ConditionType) xpv1.Condition {
-	return mg.Status.GetCondition(ct)
-}
-
-// GetDeletionPolicy of this Vhost.
-func (mg *Vhost) GetDeletionPolicy() xpv1.DeletionPolicy {
-	return mg.Spec.DeletionPolicy
-}
-
-// GetManagementPolicies of this Vhost.
-func (mg *Vhost) GetManagementPolicies() xpv1.ManagementPolicies {
-	return mg.Spec.ManagementPolicies
-}
-
-// GetProviderConfigReference of this Vhost.
-func (mg *Vhost) GetProviderConfigReference() *xpv1.Reference {
-	return mg.Spec.ProviderConfigReference
-}
-
-// GetPublishConnectionDetailsTo of this Vhost.
-func (mg *Vhost) GetPublishConnectionDetailsTo() *xpv1.PublishConnectionDetailsTo {
-	return mg.Spec.PublishConnectionDetailsTo
 }
 
 // GetCondition of this User.

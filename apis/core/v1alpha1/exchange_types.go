@@ -27,12 +27,22 @@ import (
 
 // ExchangeParameters are the configurable fields of a Exchange.
 type ExchangeParameters struct {
-	ConfigurableField string `json:"configurableField"`
+	Vhost            string            `json:"vhost"`
+	ExchangeSettings *ExchangeSettings `json:"exchange_settings,omitempty"`
+}
+
+type ExchangeSettings struct {
+	Type       *string `json:"type,omitempty"`
+	Durable    *bool   `json:"durable,omitempty"`
+	AutoDelete *bool   `json:"auto_delete,omitempty"`
 }
 
 // ExchangeObservation are the observable fields of a Exchange.
 type ExchangeObservation struct {
-	ObservableField string `json:"observableField,omitempty"`
+	Vhost      string `json:"vhost,omitempty"`
+	Type       string `json:"type,omitempty"`
+	Durable    bool   `json:"durable,omitempty"`
+	AutoDelete bool   `json:"auto_delete,omitempty"`
 }
 
 // A ExchangeSpec defines the desired state of a Exchange.

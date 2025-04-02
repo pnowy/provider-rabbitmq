@@ -1,0 +1,13 @@
+apiVersion: core.rabbitmq.crossplane.io/v1alpha1
+kind: Exchange
+metadata:
+  name: myexchange
+spec:
+  forProvider:
+    vhost: demo
+    exchange_settings:
+      type: fanout
+      durable: false
+      auto_delete: true
+  providerConfigRef:
+    name: yoel
