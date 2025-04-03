@@ -27,7 +27,7 @@ import (
 
 // ExchangeParameters are the configurable fields of a Exchange.
 type ExchangeParameters struct {
-	Name             string            `json:"name,omitempty"`
+	Name             *string           `json:"name,omitempty"`
 	Vhost            string            `json:"vhost"`
 	ExchangeSettings *ExchangeSettings `json:"exchange_settings,omitempty"`
 }

@@ -135,7 +135,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errNotExchange)
 	}
 
-	exchangeName := getName(&cr.Spec.ForProvider, cr.Name)
+	exchangeName := getExchangeName(cr)
 	fmt.Printf("Observing exchange: %+v\n", exchangeName)
 	apiExchange, err := c.service.Rmqc.GetExchange(cr.Spec.ForProvider.Vhost, exchangeName)
 
@@ -170,7 +170,7 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	if !ok {
 		return managed.ExternalCreation{}, errors.New(errNotExchange)
 	}
-	exchangeName := getName(&cr.Spec.ForProvider, cr.Name)
+	exchangeName := getExchangeName(cr)
 	fmt.Printf("Creating exchange: %+v\n", exchangeName)
 
 	resp, err := c.service.Rmqc.DeclareExchange(cr.Spec.ForProvider.Vhost, exchangeName, GenerateExchangeOptions(cr.Spec.ForProvider.ExchangeSettings))
@@ -195,7 +195,7 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalUpdate{}, errors.New(errNotExchange)
 	}
 
-	exchangeName := getName(&cr.Spec.ForProvider, cr.Name)
+	exchangeName := getExchangeName(cr)
 	fmt.Printf("Updating exchange: %+v\n", exchangeName)
 
 	resp, err := c.service.Rmqc.DeclareExchange(cr.Spec.ForProvider.Vhost, exchangeName, GenerateExchangeOptions(cr.Spec.ForProvider.ExchangeSettings))
@@ -220,7 +220,7 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalDelete{}, errors.New(errNotExchange)
 	}
 
-	exchangeName := getName(&cr.Spec.ForProvider, cr.Name)
+	exchangeName := getExchangeName(cr)
 	fmt.Printf("Deleting exchange: %+v\n", exchangeName)
 	resp, err := c.service.Rmqc.DeleteExchange(cr.Spec.ForProvider.Vhost, exchangeName)
 
@@ -302,9 +302,10 @@ func isUpToDate(spec *v1alpha1.ExchangeParameters, api *rabbithole.DetailedExcha
 	return true
 }
 
-func getName(spec *v1alpha1.ExchangeParameters, objectName string) string {
-	if spec.Name == "" {
-		return objectName
+func getExchangeName(spec *v1alpha1.Exchange) string {
+	forProviderName := spec.Spec.ForProvider.Name
+	if forProviderName != nil {
+		return *forProviderName
 	}
 	return spec.Name
 }
