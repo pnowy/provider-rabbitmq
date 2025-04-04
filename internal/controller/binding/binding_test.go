@@ -20,6 +20,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/pnowy/provider-rabbitmq/internal/rabbitmqclient"
 	"github.com/google/go-cmp/cmp"
 
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
@@ -37,7 +38,7 @@ import (
 
 func TestObserve(t *testing.T) {
 	type fields struct {
-		service interface{}
+		service *rabbitmqclient.RabbitMqService
 	}
 
 	type args struct {
