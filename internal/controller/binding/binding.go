@@ -150,7 +150,16 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	bindingFound := false
 	isResourceLateInitialized := false
 	isBindingUptoDate := false
-	binding := getBinding(bindings, cr)
+	var binding *rabbithole.BindingInfo
+
+	if cr.Status.AtProvider.Vhost != "" {
+		binding = getBindingFromObservation(bindings, &cr.Status.AtProvider)
+	}
+
+	if binding == nil {
+		binding = getBinding(bindings, cr)
+	}
+
 	if binding != nil {
 		bindingFound = true
 		current := cr.Spec.ForProvider.DeepCopy()
@@ -225,7 +234,7 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 	}
 
 	// Current Binding
-	binding := getBinding(bindings, cr)
+	binding := getBindingFromObservation(bindings, &cr.Status.AtProvider)
 
 	// Binding not found, skipping removal
 	if binding != nil {
@@ -336,14 +345,14 @@ func isUpToDate(spec *v1alpha1.BindingParameters, api *rabbithole.BindingInfo) b
 	return true
 }
 
-func listBindings(spec *v1alpha1.BindingParameters, api *rabbitmqclient.RabbitMqService) (bindings []rabbithole.BindingInfo, err error) {
+func listBindings(spec *v1alpha1.BindingParameters, client *rabbitmqclient.RabbitMqService) (bindings []rabbithole.BindingInfo, err error) {
 	switch spec.DestinationType {
 	case "queue":
-		bindings, err = api.Rmqc.ListQueueBindingsBetween(spec.Vhost, spec.Source, spec.Destination)
+		bindings, err = client.Rmqc.ListQueueBindingsBetween(spec.Vhost, spec.Source, spec.Destination)
 	case "exchange":
-		bindings, err = api.Rmqc.ListExchangeBindingsBetween(spec.Vhost, spec.Source, spec.Destination)
+		bindings, err = client.Rmqc.ListExchangeBindingsBetween(spec.Vhost, spec.Source, spec.Destination)
 	default:
-		bindings, err = api.Rmqc.ListBindingsIn(spec.Vhost)
+		bindings, err = client.Rmqc.ListBindingsIn(spec.Vhost)
 
 	}
 	return bindings, err
@@ -351,7 +360,22 @@ func listBindings(spec *v1alpha1.BindingParameters, api *rabbitmqclient.RabbitMq
 
 func getBinding(bindings []rabbithole.BindingInfo, cr *v1alpha1.Binding) *rabbithole.BindingInfo {
 	for _, binding := range bindings {
-		if binding.Source == cr.Spec.ForProvider.Source && binding.Destination == cr.Spec.ForProvider.Destination && binding.DestinationType == cr.Spec.ForProvider.DestinationType {
+		if binding.Source == cr.Spec.ForProvider.Source &&
+			binding.Destination == cr.Spec.ForProvider.Destination &&
+			binding.DestinationType == cr.Spec.ForProvider.DestinationType &&
+			binding.RoutingKey == cr.Spec.ForProvider.RoutingKey {
+			return &binding
+		}
+	}
+	return nil
+}
+
+func getBindingFromObservation(bindings []rabbithole.BindingInfo, ob *v1alpha1.BindingObservation) *rabbithole.BindingInfo {
+	for _, binding := range bindings {
+		if binding.Source == ob.Source &&
+			binding.Destination == ob.Destination &&
+			binding.DestinationType == ob.DestinationType &&
+			binding.RoutingKey == ob.RoutingKey {
 			return &binding
 		}
 	}
