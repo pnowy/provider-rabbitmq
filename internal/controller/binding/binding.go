@@ -136,7 +136,16 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	// These fmt statements should be removed in the real implementation.
 	fmt.Printf("Observing binding: %+v\n", cr.Name)
 
-	bindings, err := listBindings(&cr.Spec.ForProvider, c.service)
+	var bindings []rabbithole.BindingInfo
+	var err error
+
+	if cr.Status.AtProvider.Vhost != "" {
+		bindings, err = listBindings(cr.Status.AtProvider.Vhost, cr.Status.AtProvider.Source, cr.Status.AtProvider.Destination, cr.Status.AtProvider.DestinationType, c.service)
+	}
+
+	if len(bindings) == 0 {
+		bindings, err = listBindings(cr.Spec.ForProvider.Vhost, cr.Spec.ForProvider.Source, cr.Spec.ForProvider.Destination, cr.Spec.ForProvider.DestinationType, c.service)
+	}
 
 	if err != nil {
 		if rabbitmqclient.IsNotFoundError(err) {
@@ -227,7 +236,7 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 
 	fmt.Printf("Updating binding: %+v\n", cr.Name)
 
-	bindings, err := listBindings(&cr.Spec.ForProvider, c.service)
+	bindings, err := listBindings(cr.Status.AtProvider.Vhost, cr.Status.AtProvider.Source, cr.Status.AtProvider.Destination, cr.Status.AtProvider.DestinationType, c.service)
 
 	if err != nil {
 		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdateFailed)
@@ -345,14 +354,14 @@ func isUpToDate(spec *v1alpha1.BindingParameters, api *rabbithole.BindingInfo) b
 	return true
 }
 
-func listBindings(spec *v1alpha1.BindingParameters, client *rabbitmqclient.RabbitMqService) (bindings []rabbithole.BindingInfo, err error) {
-	switch spec.DestinationType {
+func listBindings(vhost string, source string, destination string, destinationType string, client *rabbitmqclient.RabbitMqService) (bindings []rabbithole.BindingInfo, err error) {
+	switch destinationType {
 	case "queue":
-		bindings, err = client.Rmqc.ListQueueBindingsBetween(spec.Vhost, spec.Source, spec.Destination)
+		bindings, err = client.Rmqc.ListQueueBindingsBetween(vhost, source, destination)
 	case "exchange":
-		bindings, err = client.Rmqc.ListExchangeBindingsBetween(spec.Vhost, spec.Source, spec.Destination)
+		bindings, err = client.Rmqc.ListExchangeBindingsBetween(vhost, source, destination)
 	default:
-		bindings, err = client.Rmqc.ListBindingsIn(spec.Vhost)
+		bindings, err = client.Rmqc.ListBindingsIn(vhost)
 
 	}
 	return bindings, err
