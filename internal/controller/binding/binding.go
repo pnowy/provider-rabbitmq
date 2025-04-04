@@ -132,7 +132,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}
 
 	// These fmt statements should be removed in the real implementation.
-	fmt.Printf("Observing: %+v", cr)
+	fmt.Printf("Observing binding: %+v\n", cr.Name)
 	bindings, err := c.service.Rmqc.ListBindingsIn(cr.Spec.ForProvider.Vhost)
 
 	if err != nil {
@@ -147,17 +147,17 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	bindingFound := false
 	isResourceLateInitialized := false
 	isBindingUptoDate := false
-	for _, binding := range bindings {
-		if binding.Source == cr.Spec.ForProvider.Source && binding.Destination == cr.Spec.ForProvider.Destination && binding.DestinationType == cr.Spec.ForProvider.DestinationType {
-			bindingFound = true
-			current := cr.Spec.ForProvider.DeepCopy()
-			lateInitialize(&cr.Spec.ForProvider, &binding)
-			isResourceLateInitialized = !cmp.Equal(current, &cr.Spec.ForProvider)
-			cr.Status.AtProvider = GenerateBindingObservation(&binding)
-			cr.Status.SetConditions(xpv1.Available())
-			isBindingUptoDate = isUpToDate(&cr.Spec.ForProvider, &binding)
-		}
+	binding := getBinding(bindings, cr)
+	if binding != nil {
+		bindingFound = true
+		current := cr.Spec.ForProvider.DeepCopy()
+		isResourceLateInitialized = !cmp.Equal(current, &cr.Spec.ForProvider)
+		cr.Status.AtProvider = GenerateBindingObservation(binding)
+		cr.Status.SetConditions(xpv1.Available())
+		isBindingUptoDate = isUpToDate(&cr.Spec.ForProvider, binding)
 	}
+
+	fmt.Printf("Reconciling binding: %v (IsUpToDate: %v, LateInitializeBinding: %v)\n", cr.Name, isBindingUptoDate, isResourceLateInitialized)
 
 	if bindingFound == false {
 		return managed.ExternalObservation{
@@ -189,7 +189,7 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, errors.New(errNotBinding)
 	}
 
-	fmt.Printf("Creating: %+v", cr)
+	fmt.Printf("Creating binding: %+v\n", cr.Name)
 	bindingInfo := GenerateBindingInfo(&cr.Spec.ForProvider)
 	resp, err := c.service.Rmqc.DeclareBinding(cr.Spec.ForProvider.Vhost, bindingInfo)
 
@@ -213,7 +213,44 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalUpdate{}, errors.New(errNotBinding)
 	}
 
-	fmt.Printf("Updating: %+v", cr)
+	fmt.Printf("Updating binding: %+v\n", cr.Name)
+
+	bindings, err := c.service.Rmqc.ListBindingsIn(cr.Spec.ForProvider.Vhost)
+
+	if err != nil {
+		return managed.ExternalUpdate{}, nil
+	}
+
+	//Current Binding
+	binding := getBinding(bindings, cr)
+
+	// Binding not found, skipping removal
+	if binding != nil {
+		//Updates require removal and creation
+		resp, err := c.service.Rmqc.DeleteBinding(binding.Vhost, *binding)
+
+		if err != nil {
+			fmt.Printf("(Update) Error deleting binding: %+v\n", err)
+			return managed.ExternalUpdate{}, errors.Wrap(err, errDeleteFailed)
+		}
+
+		if err := resp.Body.Close(); err != nil {
+			fmt.Printf("Error closing response body: %v\n", err)
+		}
+
+	}
+
+	// Creating new binding with new config
+	bindingInfo := GenerateBindingInfo(&cr.Spec.ForProvider)
+	resp, err := c.service.Rmqc.DeclareBinding(cr.Spec.ForProvider.Vhost, bindingInfo)
+
+	if err != nil {
+		fmt.Printf("(Update) Error creating binding: %+v\n", err)
+		return managed.ExternalUpdate{}, errors.Wrap(err, errCreateFailed)
+	}
+	if err := resp.Body.Close(); err != nil {
+		fmt.Printf("Error closing response body: %v\n", err)
+	}
 
 	return managed.ExternalUpdate{
 		// Optionally return any details that may be required to connect to the
@@ -227,14 +264,14 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 	if !ok {
 		return managed.ExternalDelete{}, errors.New(errNotBinding)
 	}
-	fmt.Printf("Deleting: %+v", cr)
+	fmt.Printf("Deleting binding: %+v\n", cr.Name)
 
 	bindingInfo := GenerateBindingInfo(&cr.Spec.ForProvider)
 
 	resp, err := c.service.Rmqc.DeleteBinding(cr.Spec.ForProvider.Vhost, bindingInfo)
 
 	if err != nil {
-		fmt.Printf("Error deleting Exchange: %+v\n", err)
+		fmt.Printf("Error deleting binding: %+v\n", err)
 		return managed.ExternalDelete{}, errors.Wrap(err, errDeleteFailed)
 	}
 	if err := resp.Body.Close(); err != nil {
@@ -256,12 +293,6 @@ func GenerateBindingInfo(binding *v1alpha1.BindingParameters) rabbithole.Binding
 		PropertiesKey:   binding.RoutingKey,
 	}
 	return bidingInfo
-}
-
-func lateInitialize(spec *v1alpha1.BindingParameters, api *rabbithole.BindingInfo) {
-	if api == nil {
-		return
-	}
 }
 
 func GenerateBindingObservation(api *rabbithole.BindingInfo) v1alpha1.BindingObservation {
@@ -297,4 +328,13 @@ func isUpToDate(spec *v1alpha1.BindingParameters, api *rabbithole.BindingInfo) b
 		return false
 	}
 	return true
+}
+
+func getBinding(bindings []rabbithole.BindingInfo, cr *v1alpha1.Binding) *rabbithole.BindingInfo {
+	for _, binding := range bindings {
+		if binding.Source == cr.Spec.ForProvider.Source && binding.Destination == cr.Spec.ForProvider.Destination && binding.DestinationType == cr.Spec.ForProvider.DestinationType {
+			return &binding
+		}
+	}
+	return nil
 }
