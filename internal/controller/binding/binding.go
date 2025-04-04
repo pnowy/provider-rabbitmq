@@ -133,7 +133,8 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 
 	// These fmt statements should be removed in the real implementation.
 	fmt.Printf("Observing binding: %+v\n", cr.Name)
-	bindings, err := c.service.Rmqc.ListBindingsIn(cr.Spec.ForProvider.Vhost)
+
+	bindings, err := listBindings(&cr.Spec.ForProvider, c.service)
 
 	if err != nil {
 		if rabbitmqclient.IsNotFoundError(err) {
@@ -215,7 +216,7 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 
 	fmt.Printf("Updating binding: %+v\n", cr.Name)
 
-	bindings, err := c.service.Rmqc.ListBindingsIn(cr.Spec.ForProvider.Vhost)
+	bindings, err := listBindings(&cr.Spec.ForProvider, c.service)
 
 	if err != nil {
 		return managed.ExternalUpdate{}, nil
@@ -331,6 +332,19 @@ func isUpToDate(spec *v1alpha1.BindingParameters, api *rabbithole.BindingInfo) b
 		return false
 	}
 	return true
+}
+
+func listBindings(spec *v1alpha1.BindingParameters, api *rabbitmqclient.RabbitMqService) (bindings []rabbithole.BindingInfo, err error) {
+	if spec.DestinationType == "queue" {
+		bindings, err = api.Rmqc.ListQueueBindingsBetween(spec.Vhost, spec.Source, spec.Destination)
+
+	} else if spec.DestinationType == "exchange" {
+		bindings, err = api.Rmqc.ListExchangeBindingsBetween(spec.Vhost, spec.Source, spec.Destination)
+	} else {
+		bindings, err = api.Rmqc.ListBindingsIn(spec.Vhost)
+	}
+
+	return bindings, err
 }
 
 func getBinding(bindings []rabbithole.BindingInfo, cr *v1alpha1.Binding) *rabbithole.BindingInfo {
