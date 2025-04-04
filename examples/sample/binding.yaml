@@ -1,0 +1,13 @@
+apiVersion: core.rabbitmq.crossplane.io/v1alpha1
+kind: Binding
+metadata:
+  name: my-binding
+spec:
+  forProvider:
+    vhost: demo
+    source: myexchange
+    destination_type: queue
+    destination: test
+    routing_key: "#"
+  providerConfigRef:
+    name: provider-rabbitmq

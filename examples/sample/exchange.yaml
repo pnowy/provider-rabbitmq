@@ -7,7 +7,7 @@ spec:
     vhost: demo
     exchange_settings:
       type: fanout
-      durable: false
-      auto_delete: true
+      durable: true
+      auto_delete: false
   providerConfigRef:
     name: provider-rabbitmq
