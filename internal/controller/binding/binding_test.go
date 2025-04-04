@@ -20,8 +20,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/pnowy/provider-rabbitmq/internal/rabbitmqclient"
 	"github.com/google/go-cmp/cmp"
+	"github.com/pnowy/provider-rabbitmq/internal/rabbitmqclient"
 
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"

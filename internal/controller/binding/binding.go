@@ -19,6 +19,7 @@ package binding
 import (
 	"context"
 	"fmt"
+
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/connection"
 	"github.com/crossplane/crossplane-runtime/pkg/controller"
@@ -47,6 +48,7 @@ const (
 	errGetFailed    = "cannot get RabbitMq Binding"
 	errCreateFailed = "cannot create new Binding"
 	errDeleteFailed = "cannot delete Binding"
+	errUpdateFailed = "cannot update Binding"
 )
 
 // Setup adds a controller that reconciles Binding managed resources.
@@ -160,7 +162,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 
 	fmt.Printf("Reconciling binding: %v (IsUpToDate: %v, LateInitializeBinding: %v)\n", cr.Name, isBindingUptoDate, isResourceLateInitialized)
 
-	if bindingFound == false {
+	if !bindingFound {
 		return managed.ExternalObservation{
 			ResourceExists: false,
 		}, nil
@@ -219,15 +221,15 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 	bindings, err := listBindings(&cr.Spec.ForProvider, c.service)
 
 	if err != nil {
-		return managed.ExternalUpdate{}, nil
+		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdateFailed)
 	}
 
-	//Current Binding
+	// Current Binding
 	binding := getBinding(bindings, cr)
 
 	// Binding not found, skipping removal
 	if binding != nil {
-		//Updates require removal and creation
+		// Updates require removal and creation
 		resp, err := c.service.Rmqc.DeleteBinding(binding.Vhost, *binding)
 
 		if err != nil {
@@ -335,15 +337,15 @@ func isUpToDate(spec *v1alpha1.BindingParameters, api *rabbithole.BindingInfo) b
 }
 
 func listBindings(spec *v1alpha1.BindingParameters, api *rabbitmqclient.RabbitMqService) (bindings []rabbithole.BindingInfo, err error) {
-	if spec.DestinationType == "queue" {
+	switch spec.DestinationType {
+	case "queue":
 		bindings, err = api.Rmqc.ListQueueBindingsBetween(spec.Vhost, spec.Source, spec.Destination)
-
-	} else if spec.DestinationType == "exchange" {
+	case "exchange":
 		bindings, err = api.Rmqc.ListExchangeBindingsBetween(spec.Vhost, spec.Source, spec.Destination)
-	} else {
+	default:
 		bindings, err = api.Rmqc.ListBindingsIn(spec.Vhost)
-	}
 
+	}
 	return bindings, err
 }
 
