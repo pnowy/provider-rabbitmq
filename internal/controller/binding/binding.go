@@ -290,7 +290,10 @@ func GenerateBindingInfo(binding *v1alpha1.BindingParameters) rabbithole.Binding
 		Destination:     binding.Destination,
 		DestinationType: binding.DestinationType,
 		RoutingKey:      binding.RoutingKey,
-		PropertiesKey:   binding.RoutingKey,
+		// RabbitMQ API: /api/bindings/{vhost}/e/{source}/{destination_type}/{destination}/routing_key
+		// Library Delete method: /api/bindings/{vhost}/e/{source}/{destination_type}/{destination}/{properties_keys}
+		// Then: PropertiesKey = RoutingKey
+		PropertiesKey: binding.RoutingKey,
 	}
 	return bidingInfo
 }
