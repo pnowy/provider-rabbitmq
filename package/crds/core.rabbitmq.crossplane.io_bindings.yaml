@@ -72,6 +72,17 @@ spec:
                 type: string
               forProvider:
                 description: BindingParameters are the configurable fields of a Binding.
+                x-kubernetes-validations:
+                  - rule: "!has(oldSelf.destination) || self.destination == oldSelf.destination"
+                    message: "Destination is immutable once set"
+                  - rule: "!has(oldSelf.destination_type) || self.destination_type == oldSelf.destination_type"
+                    message: "Destination Type is immutable once set"
+                  - rule: "!has(oldSelf.source) || self.source == oldSelf.source"
+                    message: "Source is immutable once set"
+                  - rule: "!has(oldSelf.vhost) || self.vhost == oldSelf.vhost"
+                    message: "Vhost is immutable once set"
+                  - rule: "!has(oldSelf.routing_key) || self.routing_key == oldSelf.routing_key"
+                    message: "RoutingKey is immutable once set"
                 properties:
                   destination:
                     type: string
@@ -267,6 +278,8 @@ spec:
                     type: string
                   destination_type:
                     type: string
+                  properties_key:
+                    type: string
                   routing_key:
                     type: string
                   source:
@@ -276,6 +289,7 @@ spec:
                 required:
                 - destination
                 - destination_type
+                - properties_key
                 - routing_key
                 - source
                 - vhost

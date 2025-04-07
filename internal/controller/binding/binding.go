@@ -19,11 +19,14 @@ package binding
 import (
 	"context"
 	"fmt"
+	"net/url"
+	"strings"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/connection"
 	"github.com/crossplane/crossplane-runtime/pkg/controller"
 	"github.com/crossplane/crossplane-runtime/pkg/event"
+	"github.com/crossplane/crossplane-runtime/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/pkg/ratelimiter"
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
@@ -136,16 +139,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	// These fmt statements should be removed in the real implementation.
 	fmt.Printf("Observing binding: %+v\n", cr.Name)
 
-	var bindings []rabbithole.BindingInfo
-	var err error
-
-	if cr.Status.AtProvider.Vhost != "" {
-		bindings, err = listBindings(cr.Status.AtProvider.Vhost, cr.Status.AtProvider.Source, cr.Status.AtProvider.Destination, cr.Status.AtProvider.DestinationType, c.service)
-	}
-
-	if len(bindings) == 0 {
-		bindings, err = listBindings(cr.Spec.ForProvider.Vhost, cr.Spec.ForProvider.Source, cr.Spec.ForProvider.Destination, cr.Spec.ForProvider.DestinationType, c.service)
-	}
+	bindings, err := listBindings(cr.Spec.ForProvider.Vhost, cr.Spec.ForProvider.Source, cr.Spec.ForProvider.Destination, cr.Spec.ForProvider.DestinationType, c.service)
 
 	if err != nil {
 		if rabbitmqclient.IsNotFoundError(err) {
@@ -159,15 +153,8 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	bindingFound := false
 	isResourceLateInitialized := false
 	isBindingUptoDate := false
-	var binding *rabbithole.BindingInfo
 
-	if cr.Status.AtProvider.Vhost != "" {
-		binding = getBindingFromObservation(bindings, &cr.Status.AtProvider)
-	}
-
-	if binding == nil {
-		binding = getBinding(bindings, cr)
-	}
+	binding := getBinding(bindings, cr)
 
 	if binding != nil {
 		bindingFound = true
@@ -206,6 +193,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 
 func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {
 	cr, ok := mg.(*v1alpha1.Binding)
+
 	if !ok {
 		return managed.ExternalCreation{}, errors.New(errNotBinding)
 	}
@@ -214,9 +202,16 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	bindingInfo := GenerateBindingInfo(&cr.Spec.ForProvider)
 	resp, err := c.service.Rmqc.DeclareBinding(cr.Spec.ForProvider.Vhost, bindingInfo)
 
+	// ID returned by RabbitMQ server
+	location := strings.Split(resp.Header.Get("Location"), "/")
+	propertiesKey, err := url.PathUnescape(location[len(location)-1])
+
 	if err != nil {
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateFailed)
 	}
+	// Storing ID in external name
+	meta.SetExternalName(cr, getBindingExternalName(&cr.Spec.ForProvider, propertiesKey))
+
 	if err := resp.Body.Close(); err != nil {
 		fmt.Printf("Error closing response body: %v\n", err)
 	}
@@ -235,44 +230,7 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 	}
 
 	fmt.Printf("Updating binding: %+v\n", cr.Name)
-
-	bindings, err := listBindings(cr.Status.AtProvider.Vhost, cr.Status.AtProvider.Source, cr.Status.AtProvider.Destination, cr.Status.AtProvider.DestinationType, c.service)
-
-	if err != nil {
-		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdateFailed)
-	}
-
-	// Current Binding
-	binding := getBindingFromObservation(bindings, &cr.Status.AtProvider)
-
-	// Binding not found, skipping removal
-	if binding != nil {
-		// Updates require removal and creation
-		resp, err := c.service.Rmqc.DeleteBinding(binding.Vhost, *binding)
-
-		if err != nil {
-			fmt.Printf("(Update) Error deleting binding: %+v\n", err)
-			return managed.ExternalUpdate{}, errors.Wrap(err, errDeleteFailed)
-		}
-
-		if err := resp.Body.Close(); err != nil {
-			fmt.Printf("Error closing response body: %v\n", err)
-		}
-
-	}
-
-	// Creating new binding with new config
-	bindingInfo := GenerateBindingInfo(&cr.Spec.ForProvider)
-	resp, err := c.service.Rmqc.DeclareBinding(cr.Spec.ForProvider.Vhost, bindingInfo)
-
-	if err != nil {
-		fmt.Printf("(Update) Error creating binding: %+v\n", err)
-		return managed.ExternalUpdate{}, errors.Wrap(err, errCreateFailed)
-	}
-	if err := resp.Body.Close(); err != nil {
-		fmt.Printf("Error closing response body: %v\n", err)
-	}
-
+	// TODO
 	return managed.ExternalUpdate{
 		// Optionally return any details that may be required to connect to the
 		// external resource. These will be stored as the connection secret.
@@ -288,7 +246,8 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 	fmt.Printf("Deleting binding: %+v\n", cr.Name)
 
 	bindingInfo := GenerateBindingInfo(&cr.Spec.ForProvider)
-
+	// Getting Properties Keys from Status
+	bindingInfo.PropertiesKey = cr.Status.AtProvider.PropertiesKey
 	resp, err := c.service.Rmqc.DeleteBinding(cr.Spec.ForProvider.Vhost, bindingInfo)
 
 	if err != nil {
@@ -311,10 +270,6 @@ func GenerateBindingInfo(binding *v1alpha1.BindingParameters) rabbithole.Binding
 		Destination:     binding.Destination,
 		DestinationType: binding.DestinationType,
 		RoutingKey:      binding.RoutingKey,
-		// RabbitMQ API: /api/bindings/{vhost}/e/{source}/{destination_type}/{destination}/routing_key
-		// Library Delete method: /api/bindings/{vhost}/e/{source}/{destination_type}/{destination}/{properties_keys}
-		// Then: PropertiesKey = RoutingKey
-		PropertiesKey: binding.RoutingKey,
 	}
 	return bidingInfo
 }
@@ -329,6 +284,7 @@ func GenerateBindingObservation(api *rabbithole.BindingInfo) v1alpha1.BindingObs
 		Destination:     api.Destination,
 		DestinationType: api.DestinationType,
 		RoutingKey:      api.RoutingKey,
+		PropertiesKey:   api.PropertiesKey,
 	}
 
 	return binding
@@ -389,4 +345,8 @@ func getBindingFromObservation(bindings []rabbithole.BindingInfo, ob *v1alpha1.B
 		}
 	}
 	return nil
+}
+
+func getBindingExternalName(binding *v1alpha1.BindingParameters, propertiesKey string) string {
+	return binding.Vhost + "/" + binding.Source + "/" + binding.Destination + "/" + binding.DestinationType + "/" + propertiesKey
 }
