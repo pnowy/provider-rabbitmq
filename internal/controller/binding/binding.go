@@ -333,11 +333,17 @@ func listBindings(vhost string, source string, destination string, destinationTy
 }
 
 func getBinding(bindings []rabbithole.BindingInfo, cr *v1alpha1.Binding) *rabbithole.BindingInfo {
+
+	id := strings.Split(cr.Annotations["crossplane.io/external-name"], "/")
+	// Checking if external name is updated with id
+	if len(id) < 5 {
+		return nil
+	}
 	for _, binding := range bindings {
 		if binding.Source == cr.Spec.ForProvider.Source &&
 			binding.Destination == cr.Spec.ForProvider.Destination &&
 			binding.DestinationType == cr.Spec.ForProvider.DestinationType &&
-			binding.RoutingKey == cr.Spec.ForProvider.RoutingKey {
+			binding.PropertiesKey == id[4] {
 			return &binding
 		}
 	}
