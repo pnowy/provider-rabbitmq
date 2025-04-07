@@ -26,6 +26,13 @@ import (
 )
 
 // BindingParameters are the configurable fields of a Binding.
+// +kubebuilder:validation:Required
+// +kubebuilder:validation:XValidation:rule="!has(oldSelf.destination) || self.destination == oldSelf.destination",message="Destination is immutable once set"
+// +kubebuilder:validation:XValidation:rule="!has(oldSelf.vhost) || self.vhost == oldSelf.vhost",message="Vhost is immutable once set"
+// +kubebuilder:validation:XValidation:rule="!has(oldSelf.destination_type) || self.destination_type == oldSelf.destination_type",message="Destination Type is immutable once set"
+// +kubebuilder:validation:XValidation:rule="!has(oldSelf.source) || self.source == oldSelf.source",message="Source is immutable once set"
+// +kubebuilder:validation:XValidation:rule="!has(oldSelf.routing_key) || self.routing_key == oldSelf.routing_key",message="Routing Key is immutable once set"
+// +kubebuilder:validation:XValidation:rule="!has(oldSelf.arguments) || self.arguments == oldSelf.arguments",message="Arguments are immutable once set"
 type BindingParameters struct {
 	Source          string            `json:"source"`
 	Vhost           string            `json:"vhost"`
