@@ -1,6 +1,7 @@
 package rabbitmqclient
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 
@@ -88,5 +89,5 @@ func MapsEqualJSON(m1, m2 map[string]string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return string(json1) == string(json2), err
+	return bytes.Equal(json1, json2), err
 }

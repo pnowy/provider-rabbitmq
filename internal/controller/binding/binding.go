@@ -202,6 +202,10 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	bindingInfo := GenerateBindingInfo(&cr.Spec.ForProvider)
 	resp, err := c.service.Rmqc.DeclareBinding(cr.Spec.ForProvider.Vhost, bindingInfo)
 
+	if err != nil {
+		return managed.ExternalCreation{}, errors.Wrap(err, errCreateFailed)
+	}
+
 	// ID returned by RabbitMQ server
 	location := strings.Split(resp.Header.Get("Location"), "/")
 	propertiesKey, err := url.PathUnescape(location[len(location)-1])
