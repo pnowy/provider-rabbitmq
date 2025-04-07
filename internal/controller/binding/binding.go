@@ -345,5 +345,5 @@ func getBinding(bindings []rabbithole.BindingInfo, cr *v1alpha1.Binding) *rabbit
 }
 
 func getBindingExternalName(binding *v1alpha1.BindingParameters, propertiesKey string) string {
-	return binding.Vhost + "/" + binding.Source + "/" + binding.Destination + "/" + binding.DestinationType + "/" + propertiesKey
+	return binding.Vhost + "/" + binding.Source + "/" + binding.DestinationType + "/" + binding.Destination + "/" + propertiesKey
 }
