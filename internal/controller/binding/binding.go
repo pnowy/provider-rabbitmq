@@ -311,7 +311,7 @@ func isUpToDate(spec *v1alpha1.BindingParameters, api *rabbithole.BindingInfo) b
 		return false
 	}
 
-	if !rabbitmqclient.MapsEqualJSON(rabbitmqclient.ConvertStringMaptoInterfaceMap(spec.Arguments), api.Arguments) {
+	if !rabbitmqclient.MapsEqualJSON(spec.Arguments, rabbitmqclient.ConvertInterfaceMaptoStringMap(api.Arguments)) {
 		return false
 	}
 	return true

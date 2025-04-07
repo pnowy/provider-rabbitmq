@@ -3,6 +3,7 @@ package rabbitmqclient
 import (
 	"encoding/json"
 	"fmt"
+
 	"github.com/google/go-cmp/cmp"
 )
 
@@ -78,7 +79,7 @@ func ConvertInterfaceMaptoStringMap(m map[string]interface{}) map[string]string 
 }
 
 // MapsEqualJSON compares two maps
-func MapsEqualJSON(m1, m2 map[string]interface{}) bool {
+func MapsEqualJSON(m1, m2 map[string]string) bool {
 	json1, _ := json.Marshal(m1)
 	json2, _ := json.Marshal(m2)
 	return string(json1) == string(json2)
