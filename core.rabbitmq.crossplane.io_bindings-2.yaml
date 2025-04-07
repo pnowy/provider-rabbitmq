@@ -86,10 +86,6 @@ spec:
                   - rule: "!has(oldSelf.arguments) || self.arguments == oldSelf.arguments"
                     message: "Arguments is immutable once set"
                 properties:
-                  arguments:
-                    additionalProperties:
-                      type: string
-                    type: object
                   destination:
                     type: string
                   destination_type:
@@ -280,10 +276,6 @@ spec:
               atProvider:
                 description: BindingObservation are the observable fields of a Binding.
                 properties:
-                  arguments:
-                    additionalProperties:
-                      type: string
-                    type: object
                   destination:
                     type: string
                   destination_type:
@@ -297,7 +289,6 @@ spec:
                   vhost:
                     type: string
                 required:
-                - arguments
                 - destination
                 - destination_type
                 - properties_key

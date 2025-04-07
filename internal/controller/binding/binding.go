@@ -230,7 +230,7 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 	}
 
 	fmt.Printf("Updating binding: %+v\n", cr.Name)
-	// TODO
+	// TODO: ALL PARAMS ARE IMMUTABLE FROM NOW
 	return managed.ExternalUpdate{
 		// Optionally return any details that may be required to connect to the
 		// external resource. These will be stored as the connection secret.
@@ -265,11 +265,13 @@ func (c *external) Disconnect(ctx context.Context) error {
 }
 
 func GenerateBindingInfo(binding *v1alpha1.BindingParameters) rabbithole.BindingInfo {
+	arguments := rabbitmqclient.ConvertStringMaptoInterfaceMap(binding.Arguments)
 	bidingInfo := rabbithole.BindingInfo{
 		Source:          binding.Source,
 		Destination:     binding.Destination,
 		DestinationType: binding.DestinationType,
 		RoutingKey:      binding.RoutingKey,
+		Arguments:       arguments,
 	}
 	return bidingInfo
 }
@@ -285,6 +287,7 @@ func GenerateBindingObservation(api *rabbithole.BindingInfo) v1alpha1.BindingObs
 		DestinationType: api.DestinationType,
 		RoutingKey:      api.RoutingKey,
 		PropertiesKey:   api.PropertiesKey,
+		Arguments:       rabbitmqclient.ConvertInterfaceMaptoStringMap(api.Arguments),
 	}
 
 	return binding
@@ -305,6 +308,10 @@ func isUpToDate(spec *v1alpha1.BindingParameters, api *rabbithole.BindingInfo) b
 		return false
 	}
 	if spec.RoutingKey != api.RoutingKey {
+		return false
+	}
+
+	if !rabbitmqclient.MapsEqualJSON(rabbitmqclient.ConvertStringMaptoInterfaceMap(spec.Arguments), api.Arguments) {
 		return false
 	}
 	return true
@@ -329,18 +336,6 @@ func getBinding(bindings []rabbithole.BindingInfo, cr *v1alpha1.Binding) *rabbit
 			binding.Destination == cr.Spec.ForProvider.Destination &&
 			binding.DestinationType == cr.Spec.ForProvider.DestinationType &&
 			binding.RoutingKey == cr.Spec.ForProvider.RoutingKey {
-			return &binding
-		}
-	}
-	return nil
-}
-
-func getBindingFromObservation(bindings []rabbithole.BindingInfo, ob *v1alpha1.BindingObservation) *rabbithole.BindingInfo {
-	for _, binding := range bindings {
-		if binding.Source == ob.Source &&
-			binding.Destination == ob.Destination &&
-			binding.DestinationType == ob.DestinationType &&
-			binding.RoutingKey == ob.RoutingKey {
 			return &binding
 		}
 	}

@@ -8,6 +8,8 @@ spec:
     source: myexchange
     destination_type: queue
     destination: test
-    routing_key: "#"
+    routing_key: "my-custom-key2"
+    arguments:
+      test: test3
   providerConfigRef:
-    name: provider-rabbitmq
+    name: yoel

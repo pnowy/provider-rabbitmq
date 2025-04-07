@@ -1,6 +1,10 @@
 package rabbitmqclient
 
-import "github.com/google/go-cmp/cmp"
+import (
+	"encoding/json"
+	"fmt"
+	"github.com/google/go-cmp/cmp"
+)
 
 // IsBoolEqualToBoolPtr compares a *bool with bool
 func IsBoolEqualToBoolPtr(bp *bool, b bool) bool {
@@ -49,4 +53,33 @@ func IsStringPtrEqualToString(sp *string, s string) bool {
 		}
 	}
 	return true
+}
+
+// ConvertStringMaptoInterfaceMap convert map[string]string to map[string]interface{}
+func ConvertStringMaptoInterfaceMap(m map[string]string) map[string]interface{} {
+	finalMap := make(map[string]interface{}, len(m))
+	for k, v := range m {
+		finalMap[k] = v
+	}
+	return finalMap
+}
+
+// ConvertInterfaceMaptoStringMap convert map[string]interface{} to map[string]string
+func ConvertInterfaceMaptoStringMap(m map[string]interface{}) map[string]string {
+	finalMap := make(map[string]string)
+	for k, v := range m {
+		if strValue, ok := v.(string); ok {
+			finalMap[k] = strValue
+		} else {
+			finalMap[k] = fmt.Sprintf("%v", v)
+		}
+	}
+	return finalMap
+}
+
+// MapsEqualJSON compares two maps
+func MapsEqualJSON(m1, m2 map[string]interface{}) bool {
+	json1, _ := json.Marshal(m1)
+	json2, _ := json.Marshal(m2)
+	return string(json1) == string(json2)
 }

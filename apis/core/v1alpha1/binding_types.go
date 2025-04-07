@@ -27,21 +27,23 @@ import (
 
 // BindingParameters are the configurable fields of a Binding.
 type BindingParameters struct {
-	Source          string `json:"source"`
-	Vhost           string `json:"vhost"`
-	Destination     string `json:"destination"`
-	DestinationType string `json:"destination_type"`
-	RoutingKey      string `json:"routing_key"`
+	Source          string            `json:"source"`
+	Vhost           string            `json:"vhost"`
+	Destination     string            `json:"destination"`
+	DestinationType string            `json:"destination_type"`
+	RoutingKey      string            `json:"routing_key"`
+	Arguments       map[string]string `json:"arguments,omitempty"`
 }
 
 // BindingObservation are the observable fields of a Binding.
 type BindingObservation struct {
-	Source          string `json:"source"`
-	Vhost           string `json:"vhost"`
-	Destination     string `json:"destination"`
-	DestinationType string `json:"destination_type"`
-	RoutingKey      string `json:"routing_key"`
-	PropertiesKey   string `json:"properties_key"`
+	Source          string            `json:"source"`
+	Vhost           string            `json:"vhost"`
+	Destination     string            `json:"destination"`
+	DestinationType string            `json:"destination_type"`
+	RoutingKey      string            `json:"routing_key"`
+	PropertiesKey   string            `json:"properties_key"`
+	Arguments       map[string]string `json:"arguments"`
 }
 
 // A BindingSpec defines the desired state of a Binding.
