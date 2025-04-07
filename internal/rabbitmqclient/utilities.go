@@ -79,8 +79,14 @@ func ConvertInterfaceMaptoStringMap(m map[string]interface{}) map[string]string 
 }
 
 // MapsEqualJSON compares two maps
-func MapsEqualJSON(m1, m2 map[string]string) bool {
-	json1, _ := json.Marshal(m1)
-	json2, _ := json.Marshal(m2)
-	return string(json1) == string(json2)
+func MapsEqualJSON(m1, m2 map[string]string) (bool, error) {
+	json1, err := json.Marshal(m1)
+	if err != nil {
+		return false, err
+	}
+	json2, err := json.Marshal(m2)
+	if err != nil {
+		return false, err
+	}
+	return string(json1) == string(json2), err
 }

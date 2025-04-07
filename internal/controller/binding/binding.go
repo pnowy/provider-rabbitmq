@@ -310,8 +310,8 @@ func isUpToDate(spec *v1alpha1.BindingParameters, api *rabbithole.BindingInfo) b
 	if spec.RoutingKey != api.RoutingKey {
 		return false
 	}
-
-	if !rabbitmqclient.MapsEqualJSON(spec.Arguments, rabbitmqclient.ConvertInterfaceMaptoStringMap(api.Arguments)) {
+	areArgumentsUpToDate, _ := rabbitmqclient.MapsEqualJSON(spec.Arguments, rabbitmqclient.ConvertInterfaceMaptoStringMap(api.Arguments))
+	if !areArgumentsUpToDate {
 		return false
 	}
 	return true
