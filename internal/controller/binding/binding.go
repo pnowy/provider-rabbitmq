@@ -315,10 +315,8 @@ func isUpToDate(spec *v1alpha1.BindingParameters, api *rabbithole.BindingInfo) b
 		return false
 	}
 	areArgumentsUpToDate, _ := rabbitmqclient.MapsEqualJSON(spec.Arguments, rabbitmqclient.ConvertInterfaceMaptoStringMap(api.Arguments))
-	if !areArgumentsUpToDate {
-		return false
-	}
-	return true
+
+	return areArgumentsUpToDate
 }
 
 func listBindings(vhost string, source string, destination string, destinationType string, client *rabbitmqclient.RabbitMqService) (bindings []rabbithole.BindingInfo, err error) {
