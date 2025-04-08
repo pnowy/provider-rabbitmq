@@ -20,6 +20,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/controller"
 	"github.com/pnowy/provider-rabbitmq/internal/controller/binding"
 	"github.com/pnowy/provider-rabbitmq/internal/controller/exchange"
+	"github.com/pnowy/provider-rabbitmq/internal/controller/permissions"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/pnowy/provider-rabbitmq/internal/controller/config"
@@ -36,6 +37,7 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 		user.Setup,
 		exchange.Setup,
 		binding.Setup,
+		permissions.Setup,
 	} {
 		if err := setup(mgr, o); err != nil {
 			return err
