@@ -51,7 +51,7 @@ const (
 	errGetFailed                          = "cannot get RabbitMq Binding"
 	errCreateFailed                       = "cannot create new Binding"
 	errDeleteFailed                       = "cannot delete Binding"
-	errorUpdateFailed                     = "Binding cannot be updated. Please, Try to recreate it"
+	errorUpdateNotSupported               = "Binding cannot be updated. Please, Try to recreate it"
 	PROPERTIES_KEY_EXPECTED_PARTS_COUNTER = 5
 )
 
@@ -230,7 +230,7 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 
 func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
 	// TODO: ALL PARAMS ARE IMMUTABLE FROM NOW
-	return managed.ExternalUpdate{}, errors.New(errorUpdateFailed)
+	return managed.ExternalUpdate{}, errors.New(errorUpdateNotSupported)
 }
 
 func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.ExternalDelete, error) {
