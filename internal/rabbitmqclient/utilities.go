@@ -57,8 +57,8 @@ func IsStringPtrEqualToString(sp *string, s string) bool {
 	return true
 }
 
-// ConvertStringMaptoInterfaceMap convert map[string]string to map[string]interface{}
-func ConvertStringMaptoInterfaceMap(m map[string]string) map[string]interface{} {
+// ConvertStringMapToInterfaceMap convert map[string]string to map[string]interface{}
+func ConvertStringMapToInterfaceMap(m map[string]string) map[string]interface{} {
 	finalMap := make(map[string]interface{}, len(m))
 	for k, v := range m {
 		finalMap[k] = v
@@ -66,8 +66,8 @@ func ConvertStringMaptoInterfaceMap(m map[string]string) map[string]interface{} 
 	return finalMap
 }
 
-// ConvertInterfaceMaptoStringMap convert map[string]interface{} to map[string]string
-func ConvertInterfaceMaptoStringMap(m map[string]interface{}) map[string]string {
+// ConvertInterfaceMapToStringMap convert map[string]interface{} to map[string]string
+func ConvertInterfaceMapToStringMap(m map[string]interface{}) map[string]string {
 	finalMap := make(map[string]string)
 	for k, v := range m {
 		if strValue, ok := v.(string); ok {

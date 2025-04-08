@@ -43,15 +43,16 @@ import (
 )
 
 const (
-	errNotBinding   = "managed resource is not a Binding custom resource"
-	errTrackPCUsage = "cannot track ProviderConfig usage"
-	errGetPC        = "cannot get ProviderConfig"
-	errGetCreds     = "cannot get credentials"
-	errNewClient    = "cannot create new Service"
-	errGetFailed    = "cannot get RabbitMq Binding"
-	errCreateFailed = "cannot create new Binding"
-	errDeleteFailed = "cannot delete Binding"
-	errUpdateFailed = "cannot update Binding"
+	errNotBinding                         = "managed resource is not a Binding custom resource"
+	errTrackPCUsage                       = "cannot track ProviderConfig usage"
+	errGetPC                              = "cannot get ProviderConfig"
+	errGetCreds                           = "cannot get credentials"
+	errNewClient                          = "cannot create new Service"
+	errGetFailed                          = "cannot get RabbitMq Binding"
+	errCreateFailed                       = "cannot create new Binding"
+	errDeleteFailed                       = "cannot delete Binding"
+	errorUpdateFailed                     = "Binding cannot be updated. Please, Try to recreate it"
+	PROPERTIES_KEY_EXPECTED_PARTS_COUNTER = 5
 )
 
 // Setup adds a controller that reconciles Binding managed resources.
@@ -228,18 +229,8 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 }
 
 func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
-	cr, ok := mg.(*v1alpha1.Binding)
-	if !ok {
-		return managed.ExternalUpdate{}, errors.New(errNotBinding)
-	}
-
-	fmt.Printf("Updating binding: %+v\n", cr.Name)
 	// TODO: ALL PARAMS ARE IMMUTABLE FROM NOW
-	return managed.ExternalUpdate{
-		// Optionally return any details that may be required to connect to the
-		// external resource. These will be stored as the connection secret.
-		ConnectionDetails: managed.ConnectionDetails{},
-	}, nil
+	return managed.ExternalUpdate{}, errors.New(errorUpdateFailed)
 }
 
 func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.ExternalDelete, error) {
@@ -269,7 +260,7 @@ func (c *external) Disconnect(ctx context.Context) error {
 }
 
 func GenerateBindingInfo(binding *v1alpha1.BindingParameters) rabbithole.BindingInfo {
-	arguments := rabbitmqclient.ConvertStringMaptoInterfaceMap(binding.Arguments)
+	arguments := rabbitmqclient.ConvertStringMapToInterfaceMap(binding.Arguments)
 	bidingInfo := rabbithole.BindingInfo{
 		Source:          binding.Source,
 		Destination:     binding.Destination,
@@ -291,7 +282,7 @@ func GenerateBindingObservation(api *rabbithole.BindingInfo) v1alpha1.BindingObs
 		DestinationType: api.DestinationType,
 		RoutingKey:      api.RoutingKey,
 		PropertiesKey:   api.PropertiesKey,
-		Arguments:       rabbitmqclient.ConvertInterfaceMaptoStringMap(api.Arguments),
+		Arguments:       rabbitmqclient.ConvertInterfaceMapToStringMap(api.Arguments),
 	}
 
 	return binding
@@ -314,7 +305,7 @@ func isUpToDate(spec *v1alpha1.BindingParameters, api *rabbithole.BindingInfo) b
 	if spec.RoutingKey != api.RoutingKey {
 		return false
 	}
-	areArgumentsUpToDate, _ := rabbitmqclient.MapsEqualJSON(spec.Arguments, rabbitmqclient.ConvertInterfaceMaptoStringMap(api.Arguments))
+	areArgumentsUpToDate, _ := rabbitmqclient.MapsEqualJSON(spec.Arguments, rabbitmqclient.ConvertInterfaceMapToStringMap(api.Arguments))
 
 	return areArgumentsUpToDate
 }
@@ -334,16 +325,20 @@ func listBindings(vhost string, source string, destination string, destinationTy
 
 func getBinding(bindings []rabbithole.BindingInfo, cr *v1alpha1.Binding) *rabbithole.BindingInfo {
 
+	// ID Expected = vhost/source/destination_type/destination/propertiesKey
 	id := strings.Split(cr.Annotations["crossplane.io/external-name"], "/")
+
 	// Checking if external name is updated with id
-	if len(id) < 5 {
+	if len(id) < PROPERTIES_KEY_EXPECTED_PARTS_COUNTER {
 		return nil
 	}
+
+	propertiesKey := id[4]
 	for _, binding := range bindings {
 		if binding.Source == cr.Spec.ForProvider.Source &&
 			binding.Destination == cr.Spec.ForProvider.Destination &&
 			binding.DestinationType == cr.Spec.ForProvider.DestinationType &&
-			binding.PropertiesKey == id[4] {
+			binding.PropertiesKey == propertiesKey {
 			return &binding
 		}
 	}
