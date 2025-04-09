@@ -136,7 +136,6 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}
 
 	exchangeName := getExchangeName(cr)
-	fmt.Printf("Observing exchange: %+v\n", exchangeName)
 	apiExchange, err := c.service.Rmqc.GetExchange(cr.Spec.ForProvider.Vhost, exchangeName)
 
 	if err != nil {

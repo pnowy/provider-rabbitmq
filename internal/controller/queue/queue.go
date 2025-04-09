@@ -135,7 +135,6 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}
 
 	queueName := getQueueName(cr)
-	fmt.Printf("Observing: %+v\n", queueName)
 	apiQueue, err := c.service.Rmqc.GetQueue(cr.Spec.ForProvider.Vhost, queueName)
 	if err != nil {
 		if rabbitmqclient.IsNotFoundError(err) {
@@ -152,11 +151,13 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	cr.Status.AtProvider = generateQueueObservation(apiQueue)
 	cr.Status.SetConditions(xpv1.Available())
 
-	isExchangeUptoDate := isUpToDate(&cr.Spec.ForProvider, apiQueue)
+	isUptoDate := isUpToDate(&cr.Spec.ForProvider, apiQueue)
+
+	fmt.Printf("Reconciling queue: %v (IsUpToDate: %v, LateInitializeVhost: %v)\n", queueName, isUptoDate, isResourceLateInitialized)
 
 	return managed.ExternalObservation{
 		ResourceExists:          true,
-		ResourceUpToDate:        isExchangeUptoDate,
+		ResourceUpToDate:        isUptoDate,
 		ResourceLateInitialized: isResourceLateInitialized,
 	}, nil
 }
@@ -188,7 +189,10 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalUpdate{}, errors.New(errNotQueue)
 	}
 
-	fmt.Printf("Updating: %+v", cr)
+	queueName := getQueueName(cr)
+	fmt.Printf("Updating queue: %+v", queueName)
+
+	// TODO
 
 	return managed.ExternalUpdate{
 		// Optionally return any details that may be required to connect to the

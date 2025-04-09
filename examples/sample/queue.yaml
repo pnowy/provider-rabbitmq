@@ -1,0 +1,13 @@
+apiVersion: core.rabbitmq.crossplane.io/v1alpha1
+kind: Queue
+metadata:
+  name: myqueue
+spec:
+  forProvider:
+    vhost: demo
+#    exchange_settings:
+#      type: fanout
+#      durable: true
+#      auto_delete: false
+  providerConfigRef:
+    name: provider-rabbitmq
