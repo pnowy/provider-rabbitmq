@@ -18,11 +18,9 @@ package permissions
 
 import (
 	"context"
-	rabbithole "github.com/michaelklishin/rabbit-hole/v3"
-	"github.com/pnowy/provider-rabbitmq/apis/core/v1alpha1"
-	"testing"
-
 	"github.com/google/go-cmp/cmp"
+	"github.com/pnowy/provider-rabbitmq/internal/rabbitmqclient"
+	"testing"
 
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
@@ -39,7 +37,7 @@ import (
 
 func TestObserve(t *testing.T) {
 	type fields struct {
-		service interface{}
+		service *rabbitmqclient.RabbitMqService
 	}
 
 	type args struct {
