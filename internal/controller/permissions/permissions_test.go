@@ -18,6 +18,7 @@ package permissions
 
 import (
 	"context"
+
 	"github.com/google/go-cmp/cmp"
 	"github.com/pnowy/provider-rabbitmq/internal/rabbitmqclient"
 	"testing"
