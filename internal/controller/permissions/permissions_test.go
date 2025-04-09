@@ -18,10 +18,10 @@ package permissions
 
 import (
 	"context"
+	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/pnowy/provider-rabbitmq/internal/rabbitmqclient"
-	"testing"
 
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
