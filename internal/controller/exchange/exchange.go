@@ -150,7 +150,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	current := cr.Spec.ForProvider.DeepCopy()
 	lateInitialize(&cr.Spec.ForProvider, apiExchange)
 	isResourceLateInitialized := !cmp.Equal(current, &cr.Spec.ForProvider)
-	cr.Status.AtProvider = GenerateExchangeObservation(apiExchange)
+	cr.Status.AtProvider = generateExchangeObservation(apiExchange)
 	cr.Status.SetConditions(xpv1.Available())
 
 	isExchangeUptoDate := isUpToDate(&cr.Spec.ForProvider, apiExchange)
@@ -173,7 +173,7 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	exchangeName := getExchangeName(cr)
 	fmt.Printf("Creating exchange: %+v\n", exchangeName)
 
-	resp, err := c.service.Rmqc.DeclareExchange(cr.Spec.ForProvider.Vhost, exchangeName, GenerateExchangeOptions(cr.Spec.ForProvider.ExchangeSettings))
+	resp, err := c.service.Rmqc.DeclareExchange(cr.Spec.ForProvider.Vhost, exchangeName, generateExchangeOptions(cr.Spec.ForProvider.ExchangeSettings))
 
 	if err != nil {
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateFailed)
@@ -198,7 +198,7 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 	exchangeName := getExchangeName(cr)
 	fmt.Printf("Updating exchange: %+v\n", exchangeName)
 
-	resp, err := c.service.Rmqc.DeclareExchange(cr.Spec.ForProvider.Vhost, exchangeName, GenerateExchangeOptions(cr.Spec.ForProvider.ExchangeSettings))
+	resp, err := c.service.Rmqc.DeclareExchange(cr.Spec.ForProvider.Vhost, exchangeName, generateExchangeOptions(cr.Spec.ForProvider.ExchangeSettings))
 
 	if err != nil {
 		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdateFailed)
@@ -247,7 +247,7 @@ func lateInitialize(spec *v1alpha1.ExchangeParameters, api *rabbithole.DetailedE
 	}
 }
 
-func GenerateExchangeObservation(api *rabbithole.DetailedExchangeInfo) v1alpha1.ExchangeObservation {
+func generateExchangeObservation(api *rabbithole.DetailedExchangeInfo) v1alpha1.ExchangeObservation {
 	if api == nil {
 		return v1alpha1.ExchangeObservation{}
 	}
@@ -262,7 +262,7 @@ func GenerateExchangeObservation(api *rabbithole.DetailedExchangeInfo) v1alpha1.
 	return exchange
 }
 
-func GenerateExchangeOptions(spec *v1alpha1.ExchangeSettings) rabbithole.ExchangeSettings {
+func generateExchangeOptions(spec *v1alpha1.ExchangeSettings) rabbithole.ExchangeSettings {
 	if spec == nil {
 		settings := rabbithole.ExchangeSettings{}
 		// Default value (Type is required in rabbitMq api)

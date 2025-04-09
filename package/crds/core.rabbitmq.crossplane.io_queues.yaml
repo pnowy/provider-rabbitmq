@@ -73,10 +73,21 @@ spec:
               forProvider:
                 description: QueueParameters are the configurable fields of a Queue.
                 properties:
-                  configurableField:
+                  name:
+                    type: string
+                  queueSettings:
+                    properties:
+                      autoDelete:
+                        type: boolean
+                      durable:
+                        type: boolean
+                      type:
+                        type: string
+                    type: object
+                  vhost:
                     type: string
                 required:
-                - configurableField
+                - vhost
                 type: object
               managementPolicies:
                 default:
@@ -251,8 +262,18 @@ spec:
               atProvider:
                 description: QueueObservation are the observable fields of a Queue.
                 properties:
-                  observableField:
+                  autoDelete:
+                    type: boolean
+                  durable:
+                    type: boolean
+                  name:
                     type: string
+                  type:
+                    type: string
+                  vhost:
+                    type: string
+                required:
+                - vhost
                 type: object
               conditions:
                 description: Conditions of the resource.

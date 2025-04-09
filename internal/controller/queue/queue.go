@@ -20,6 +20,11 @@ import (
 	"context"
 	"fmt"
 
+	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	"github.com/google/go-cmp/cmp"
+	rabbithole "github.com/michaelklishin/rabbit-hole/v3"
+	"github.com/pnowy/provider-rabbitmq/internal/rabbitmqclient"
+
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -39,18 +44,14 @@ import (
 
 const (
 	errNotQueue     = "managed resource is not a Queue custom resource"
+	errGetFailed    = "cannot get RabbitMq queue"
+	errCreateFailed = "cannot create RabbitMq queue"
+	errDeleteFailed = "cannot delete RabbitMq queue"
 	errTrackPCUsage = "cannot track ProviderConfig usage"
 	errGetPC        = "cannot get ProviderConfig"
 	errGetCreds     = "cannot get credentials"
 
 	errNewClient = "cannot create new Service"
-)
-
-// A NoOpService does nothing.
-type NoOpService struct{}
-
-var (
-	newNoOpService = func(_ []byte) (interface{}, error) { return &NoOpService{}, nil }
 )
 
 // Setup adds a controller that reconciles Queue managed resources.
@@ -67,7 +68,7 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 		managed.WithExternalConnecter(&connector{
 			kube:         mgr.GetClient(),
 			usage:        resource.NewProviderConfigUsageTracker(mgr.GetClient(), &apisv1alpha1.ProviderConfigUsage{}),
-			newServiceFn: newNoOpService}),
+			newServiceFn: rabbitmqclient.NewClient}),
 		managed.WithLogger(o.Logger.WithValues("controller", name)),
 		managed.WithPollInterval(o.PollInterval),
 		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name))),
@@ -86,7 +87,7 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 type connector struct {
 	kube         client.Client
 	usage        resource.Tracker
-	newServiceFn func(creds []byte) (interface{}, error)
+	newServiceFn func(creds []byte) (*rabbitmqclient.RabbitMqService, error)
 }
 
 // Connect typically produces an ExternalClient by:
@@ -123,12 +124,8 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 	return &external{service: svc}, nil
 }
 
-// An ExternalClient observes, then either creates, updates, or deletes an
-// external resource to ensure it reflects the managed resource's desired state.
 type external struct {
-	// A 'client' used to connect to the external resource API. In practice this
-	// would be something like an AWS SDK client.
-	service interface{}
+	service *rabbitmqclient.RabbitMqService
 }
 
 func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
@@ -137,23 +134,30 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errNotQueue)
 	}
 
-	// These fmt statements should be removed in the real implementation.
-	fmt.Printf("Observing: %+v", cr)
+	queueName := getQueueName(cr)
+	fmt.Printf("Observing: %+v\n", queueName)
+	apiQueue, err := c.service.Rmqc.GetQueue(cr.Spec.ForProvider.Vhost, queueName)
+	if err != nil {
+		if rabbitmqclient.IsNotFoundError(err) {
+			return managed.ExternalObservation{
+				ResourceExists: false,
+			}, nil
+		}
+		return managed.ExternalObservation{}, errors.Wrap(err, errGetFailed)
+	}
+	current := cr.Spec.ForProvider.DeepCopy()
+	lateInitialize(&cr.Spec.ForProvider, apiQueue)
+	isResourceLateInitialized := !cmp.Equal(current, &cr.Spec.ForProvider)
+
+	cr.Status.AtProvider = generateQueueObservation(apiQueue)
+	cr.Status.SetConditions(xpv1.Available())
+
+	isExchangeUptoDate := isUpToDate(&cr.Spec.ForProvider, apiQueue)
 
 	return managed.ExternalObservation{
-		// Return false when the external resource does not exist. This lets
-		// the managed resource reconciler know that it needs to call Create to
-		// (re)create the resource, or that it has successfully been deleted.
-		ResourceExists: true,
-
-		// Return false when the external resource exists, but it not up to date
-		// with the desired managed resource state. This lets the managed
-		// resource reconciler know that it needs to call Update.
-		ResourceUpToDate: true,
-
-		// Return any details that may be required to connect to the external
-		// resource. These will be stored as the connection secret.
-		ConnectionDetails: managed.ConnectionDetails{},
+		ResourceExists:          true,
+		ResourceUpToDate:        isExchangeUptoDate,
+		ResourceLateInitialized: isResourceLateInitialized,
 	}, nil
 }
 
@@ -163,13 +167,19 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, errors.New(errNotQueue)
 	}
 
-	fmt.Printf("Creating: %+v", cr)
+	queueName := getQueueName(cr)
+	fmt.Printf("Creating queue: %+v\n", queueName)
 
-	return managed.ExternalCreation{
-		// Optionally return any details that may be required to connect to the
-		// external resource. These will be stored as the connection secret.
-		ConnectionDetails: managed.ConnectionDetails{},
-	}, nil
+	resp, err := c.service.Rmqc.DeclareQueue(cr.Spec.ForProvider.Vhost, queueName, generateQueueSettings(cr.Spec.ForProvider.QueueSettings))
+
+	if err != nil {
+		return managed.ExternalCreation{}, errors.Wrap(err, errCreateFailed)
+	}
+	if err := resp.Body.Close(); err != nil {
+		fmt.Printf("Error closing response body: %v\n", err)
+	}
+
+	return managed.ExternalCreation{}, nil
 }
 
 func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
@@ -193,11 +203,86 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalDelete{}, errors.New(errNotQueue)
 	}
 
-	fmt.Printf("Deleting: %+v", cr)
+	queueName := getQueueName(cr)
+	fmt.Printf("Deleting queue: %+v\n", queueName)
+	resp, err := c.service.Rmqc.DeleteQueue(cr.Spec.ForProvider.Vhost, queueName)
+
+	if err != nil {
+		fmt.Printf("Error deleting queue: %+v\n", err)
+		return managed.ExternalDelete{}, errors.Wrap(err, errDeleteFailed)
+	}
+	if err := resp.Body.Close(); err != nil {
+		fmt.Printf("Error closing response body: %v\n", err)
+	}
 
 	return managed.ExternalDelete{}, nil
 }
 
 func (c *external) Disconnect(ctx context.Context) error {
 	return nil
+}
+
+func getQueueName(spec *v1alpha1.Queue) string {
+	forProviderName := spec.Spec.ForProvider.Name
+	if forProviderName != nil {
+		return *forProviderName
+	}
+	return spec.Name
+}
+
+func generateQueueSettings(spec *v1alpha1.QueueSettings) rabbithole.QueueSettings {
+	if spec == nil {
+		return rabbithole.QueueSettings{}
+	}
+	settings := rabbithole.QueueSettings{}
+	if spec.Type != nil {
+		settings.Type = *spec.Type
+	}
+	if spec.AutoDelete != nil {
+		settings.AutoDelete = *spec.AutoDelete
+	}
+	if spec.Durable != nil {
+		settings.Durable = *spec.Durable
+	}
+	return settings
+}
+
+func lateInitialize(spec *v1alpha1.QueueParameters, api *rabbithole.DetailedQueueInfo) {
+	if api == nil {
+		return
+	}
+	if spec.QueueSettings == nil {
+		spec.QueueSettings = &v1alpha1.QueueSettings{}
+	}
+	// TODO late init
+}
+
+func generateQueueObservation(api *rabbithole.DetailedQueueInfo) v1alpha1.QueueObservation {
+	if api == nil {
+		return v1alpha1.QueueObservation{}
+	}
+	observation := v1alpha1.QueueObservation{
+		Name:       api.Name,
+		Vhost:      api.Vhost,
+		Type:       api.Type,
+		Durable:    api.Durable,
+		AutoDelete: bool(api.AutoDelete),
+	}
+
+	return observation
+}
+
+func isUpToDate(spec *v1alpha1.QueueParameters, api *rabbithole.DetailedQueueInfo) bool { //nolint:gocyclo
+	if spec.QueueSettings != nil {
+		if !rabbitmqclient.IsStringPtrEqualToString(spec.QueueSettings.Type, api.Type) {
+			return false
+		}
+		if !rabbitmqclient.IsBoolPtrEqualToBool(spec.QueueSettings.Durable, api.Durable) {
+			return false
+		}
+		if !rabbitmqclient.IsBoolPtrEqualToBool(spec.QueueSettings.AutoDelete, bool(api.AutoDelete)) {
+			return false
+		}
+	}
+	return true
 }

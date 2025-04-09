@@ -27,12 +27,24 @@ import (
 
 // QueueParameters are the configurable fields of a Queue.
 type QueueParameters struct {
-	ConfigurableField string `json:"configurableField"`
+	Name          *string        `json:"name,omitempty"`
+	Vhost         string         `json:"vhost"`
+	QueueSettings *QueueSettings `json:"queueSettings,omitempty"`
+}
+
+type QueueSettings struct {
+	Type       *string `json:"type,omitempty"`
+	Durable    *bool   `json:"durable,omitempty"`
+	AutoDelete *bool   `json:"autoDelete,omitempty"`
 }
 
 // QueueObservation are the observable fields of a Queue.
 type QueueObservation struct {
-	ObservableField string `json:"observableField,omitempty"`
+	Name       string `json:"name,omitempty"`
+	Vhost      string `json:"vhost"`
+	Type       string `json:"type,omitempty"`
+	Durable    bool   `json:"durable,omitempty"`
+	AutoDelete bool   `json:"autoDelete,omitempty"`
 }
 
 // A QueueSpec defines the desired state of a Queue.
