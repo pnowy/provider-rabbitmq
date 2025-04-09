@@ -47,6 +47,7 @@ const (
 	errGetFailed    = "cannot get RabbitMq queue"
 	errCreateFailed = "cannot create RabbitMq queue"
 	errDeleteFailed = "cannot delete RabbitMq queue"
+	errUpdateFailed = "cannot update RabbitMq queue"
 	errTrackPCUsage = "cannot track ProviderConfig usage"
 	errGetPC        = "cannot get ProviderConfig"
 	errGetCreds     = "cannot get credentials"
@@ -190,15 +191,18 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 	}
 
 	queueName := getQueueName(cr)
-	fmt.Printf("Updating queue: %+v", queueName)
+	fmt.Printf("Updating queue: %+v\n", queueName)
 
-	// TODO
+	resp, err := c.service.Rmqc.DeclareQueue(cr.Spec.ForProvider.Vhost, queueName, generateQueueSettings(cr.Spec.ForProvider.QueueSettings))
 
-	return managed.ExternalUpdate{
-		// Optionally return any details that may be required to connect to the
-		// external resource. These will be stored as the connection secret.
-		ConnectionDetails: managed.ConnectionDetails{},
-	}, nil
+	if err != nil {
+		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdateFailed)
+	}
+	if err := resp.Body.Close(); err != nil {
+		fmt.Printf("Error closing response body: %v\n", err)
+	}
+
+	return managed.ExternalUpdate{}, nil
 }
 
 func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.ExternalDelete, error) {
