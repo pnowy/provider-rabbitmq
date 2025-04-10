@@ -76,6 +76,7 @@ spec:
                   name:
                     type: string
                   queueSettings:
+                    description: QueueSettings
                     properties:
                       autoDelete:
                         type: boolean
@@ -84,6 +85,13 @@ spec:
                       type:
                         type: string
                     type: object
+                    x-kubernetes-validations:
+                    - message: Type is immutable once set
+                      rule: '!has(oldSelf.type) || self.type == oldSelf.type'
+                    - message: Durable is immutable once set
+                      rule: '!has(oldSelf.durable) || self.durable == oldSelf.durable'
+                    - message: AutoDelete is immutable once set
+                      rule: '!has(oldSelf.autoDelete) || self.autoDelete == oldSelf.autoDelete'
                   vhost:
                     type: string
                 required:
