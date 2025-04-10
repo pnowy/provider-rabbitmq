@@ -159,7 +159,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	current := cr.Spec.ForProvider.DeepCopy()
 	lateInitialize(&cr.Spec.ForProvider, &userPerms)
 	isResourceLateInitialized := !cmp.Equal(current, &cr.Spec.ForProvider)
-	cr.Status.AtProvider = GenerateExchangeObservation(&userPerms)
+	cr.Status.AtProvider = generateExchangeObservation(&userPerms)
 	cr.Status.SetConditions(xpv1.Available())
 	isPermissionsUptoDate := isUpToDate(&cr.Spec.ForProvider, &userPerms)
 
@@ -178,7 +178,7 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	}
 
 	c.log.Info("Creating user permissions", "permissions", getPermissionsExternalName(&cr.Spec.ForProvider))
-	userPerms := GeneratePermissionSettings(cr.Spec.ForProvider.PermissionSettings)
+	userPerms := generatePermissionSettings(cr.Spec.ForProvider.PermissionSettings)
 	resp, err := c.service.Rmqc.UpdatePermissionsIn(cr.Spec.ForProvider.Vhost, cr.Spec.ForProvider.User, userPerms)
 
 	if err != nil {
@@ -207,7 +207,7 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 
 	c.log.Info("Updating user permissions", "permissions", getPermissionsExternalName(&cr.Spec.ForProvider))
 
-	userPerms := GeneratePermissionSettings(cr.Spec.ForProvider.PermissionSettings)
+	userPerms := generatePermissionSettings(cr.Spec.ForProvider.PermissionSettings)
 	resp, err := c.service.Rmqc.UpdatePermissionsIn(cr.Spec.ForProvider.Vhost, cr.Spec.ForProvider.User, userPerms)
 
 	if err != nil {
@@ -261,7 +261,7 @@ func lateInitialize(spec *v1alpha1.PermissionsParameters, api *rabbithole.Permis
 	}
 }
 
-func GenerateExchangeObservation(api *rabbithole.PermissionInfo) v1alpha1.PermissionsObservation {
+func generateExchangeObservation(api *rabbithole.PermissionInfo) v1alpha1.PermissionsObservation {
 	if api == nil {
 		return v1alpha1.PermissionsObservation{}
 	}
@@ -290,7 +290,7 @@ func isUpToDate(spec *v1alpha1.PermissionsParameters, api *rabbithole.Permission
 	return true
 }
 
-func GeneratePermissionSettings(spec *v1alpha1.PermissionSettings) rabbithole.Permissions {
+func generatePermissionSettings(spec *v1alpha1.PermissionSettings) rabbithole.Permissions {
 	userPerms := rabbithole.Permissions{}
 	userPerms.Configure = spec.Configure
 	userPerms.Write = spec.Write
