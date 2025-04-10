@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/crossplane/crossplane-runtime/pkg/meta"
+
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/google/go-cmp/cmp"
 	rabbithole "github.com/michaelklishin/rabbit-hole/v3"
@@ -180,7 +182,7 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	if err := resp.Body.Close(); err != nil {
 		fmt.Printf("Error closing response body: %v\n", err)
 	}
-
+	meta.SetExternalName(cr, getQueueName(cr))
 	return managed.ExternalCreation{}, nil
 }
 
