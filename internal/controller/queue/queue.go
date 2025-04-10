@@ -264,7 +264,16 @@ func lateInitialize(spec *v1alpha1.QueueParameters, api *rabbithole.DetailedQueu
 	if spec.QueueSettings == nil {
 		spec.QueueSettings = &v1alpha1.QueueSettings{}
 	}
-	// TODO late init
+	if spec.QueueSettings.Type == nil {
+		spec.QueueSettings.Type = &api.Type
+	}
+	if spec.QueueSettings.AutoDelete == nil {
+		autoDelete := bool(api.AutoDelete)
+		spec.QueueSettings.AutoDelete = &autoDelete
+	}
+	if spec.QueueSettings.Durable == nil {
+		spec.QueueSettings.Durable = &api.Durable
+	}
 }
 
 func generateQueueObservation(api *rabbithole.DetailedQueueInfo) v1alpha1.QueueObservation {
