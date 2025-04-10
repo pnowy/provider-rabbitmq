@@ -1,0 +1,14 @@
+apiVersion: core.rabbitmq.crossplane.io/v1alpha1
+kind: Permissions
+metadata:
+  name: my-permissions
+spec:
+  forProvider:
+    vhost: demo
+    user: test-user
+    permissions:
+      configure: .*
+      write: .*
+      read: .*
+  providerConfigRef:
+    name: provider-rabbitmq
