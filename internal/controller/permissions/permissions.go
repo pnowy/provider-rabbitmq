@@ -143,7 +143,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errNotPermissions)
 	}
 
-	c.log.Info("Observing user permissions", "permissions", getPermissionsExternalName(&cr.Spec.ForProvider))
+	// c.log.Info("Observing user permissions", "permissions", getPermissionsExternalName(&cr.Spec.ForProvider))
 
 	userPerms, err := c.service.Rmqc.GetPermissionsIn(cr.Spec.ForProvider.Vhost, cr.Spec.ForProvider.User)
 

@@ -18,14 +18,17 @@ package permissions
 
 import (
 	"context"
+	"github.com/go-logr/logr"
+	"github.com/pnowy/provider-rabbitmq/apis/core/v1alpha1"
+	"github.com/pnowy/provider-rabbitmq/internal/rabbitmqclient/fake"
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
-	"github.com/pnowy/provider-rabbitmq/internal/rabbitmqclient"
-
+	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 	"github.com/crossplane/crossplane-runtime/pkg/test"
+	"github.com/google/go-cmp/cmp"
+	"github.com/pnowy/provider-rabbitmq/internal/rabbitmqclient"
 )
 
 // Unlike many Kubernetes projects Crossplane does not use third party testing
@@ -39,6 +42,7 @@ import (
 func TestObserve(t *testing.T) {
 	type fields struct {
 		service *rabbitmqclient.RabbitMqService
+		logger  logging.Logger
 	}
 
 	type args struct {
@@ -57,7 +61,33 @@ func TestObserve(t *testing.T) {
 		args   args
 		want   want
 	}{
-		// TODO: Add test cases.
+		"ErrNoRecord": {
+			reason: "We should return ResourceExists: false when no external name is set",
+			fields: fields{
+
+				service: &rabbitmqclient.RabbitMqService{Rmqc: &fake.MockClient{}},
+				logger:  logging.NewLogrLogger(logr.Logger{}),
+			},
+			args: args{
+				mg: &v1alpha1.Permissions{
+					Spec: v1alpha1.PermissionsSpec{
+						ForProvider: v1alpha1.PermissionsParameters{
+							User:  "test",
+							Vhost: "test",
+						},
+					},
+				},
+			},
+			want: want{
+				o: managed.ExternalObservation{
+					ResourceExists:          true,
+					ResourceUpToDate:        true,
+					ResourceLateInitialized: true,
+					ConnectionDetails:       managed.ConnectionDetails{},
+					Diff:                    "",
+				},
+			},
+		},
 	}
 
 	for name, tc := range cases {
