@@ -11,7 +11,7 @@ type MockClient struct {
 	MockGetPermissionsIn    func(vhost, username string) (rec rabbithole.PermissionInfo, err error)
 	MockClearPermissionsIn  func(vhost, username string) (res *http.Response, err error)
 	// Exchange
-	MockGetExchange     func(vhost, exchange string) (res *http.Response, err error)
+	MockGetExchange     func(vhost, exchange string) (rec *rabbithole.DetailedExchangeInfo, err error)
 	MockDeclareExchange func(vhost, exchange string, info rabbithole.ExchangeSettings) (res *http.Response, err error)
 	MockDeleteExchange  func(vhost, exchange string) (res *http.Response, err error)
 	// Binding
@@ -52,7 +52,7 @@ func (m MockClient) ClearPermissionsIn(vhost, username string) (res *http.Respon
 // Exchange
 
 func (m MockClient) GetExchange(vhost, exchange string) (rec *rabbithole.DetailedExchangeInfo, err error) {
-	return m.GetExchange(vhost, exchange)
+	return m.MockGetExchange(vhost, exchange)
 }
 
 func (m MockClient) DeclareExchange(vhost, exchange string, info rabbithole.ExchangeSettings) (res *http.Response, err error) {
