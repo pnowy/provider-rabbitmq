@@ -19,19 +19,21 @@ package permissions
 import (
 	"context"
 	"errors"
+	"testing"
+
+	"net/http"
+
+	rabbithole "github.com/michaelklishin/rabbit-hole/v3"
+	pkgErrors "github.com/pkg/errors"
 
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/google/go-cmp/cmp"
-	"github.com/michaelklishin/rabbit-hole/v3"
-	pkgErrors "github.com/pkg/errors"
 	"github.com/pnowy/provider-rabbitmq/apis/core/v1alpha1"
 	"github.com/pnowy/provider-rabbitmq/internal/rabbitmqclient"
 	"github.com/pnowy/provider-rabbitmq/internal/rabbitmqclient/fake"
-	"net/http"
-	"testing"
 )
 
 // Unlike many Kubernetes projects Crossplane does not use third party testing
