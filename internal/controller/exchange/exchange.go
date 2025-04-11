@@ -51,6 +51,8 @@ const (
 	errCreateFailed = "cannot create new Exchange"
 	errDeleteFailed = "cannot delete Exchange"
 	errUpdateFailed = "cannot update Exchange"
+
+	EXCHANGE_DEFAULT_TYPE = "fanout"
 )
 
 // Setup adds a controller that reconciles Exchange managed resources.
@@ -265,7 +267,7 @@ func generateExchangeOptions(spec *v1alpha1.ExchangeSettings) rabbithole.Exchang
 	if spec == nil {
 		settings := rabbithole.ExchangeSettings{}
 		// Default value (Type is required in rabbitMq api)
-		settings.Type = "fanout"
+		settings.Type = EXCHANGE_DEFAULT_TYPE
 		return settings
 	}
 	settings := rabbithole.ExchangeSettings{}
@@ -273,7 +275,7 @@ func generateExchangeOptions(spec *v1alpha1.ExchangeSettings) rabbithole.Exchang
 		settings.Type = *spec.Type
 	} else {
 		// Default value (Type is required in rabbitMq api)
-		settings.Type = "fanout"
+		settings.Type = EXCHANGE_DEFAULT_TYPE
 	}
 
 	if spec.Durable != nil {
