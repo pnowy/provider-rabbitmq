@@ -1,8 +1,9 @@
 package fake
 
 import (
-	"github.com/michaelklishin/rabbit-hole/v3"
 	"net/http"
+
+	rabbithole "github.com/michaelklishin/rabbit-hole/v3"
 )
 
 type MockClient struct {
