@@ -21,6 +21,7 @@ import (
 	"github.com/pnowy/provider-rabbitmq/internal/controller/binding"
 	"github.com/pnowy/provider-rabbitmq/internal/controller/exchange"
 	"github.com/pnowy/provider-rabbitmq/internal/controller/permissions"
+	"github.com/pnowy/provider-rabbitmq/internal/controller/queue"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/pnowy/provider-rabbitmq/internal/controller/config"
@@ -36,6 +37,7 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 		vhost.Setup,
 		user.Setup,
 		exchange.Setup,
+		queue.Setup,
 		binding.Setup,
 		permissions.Setup,
 	} {

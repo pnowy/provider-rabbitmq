@@ -1,0 +1,9 @@
+apiVersion: core.rabbitmq.crossplane.io/v1alpha1
+kind: Queue
+metadata:
+  name: myqueue
+spec:
+  forProvider:
+    vhost: demo
+  providerConfigRef:
+    name: provider-rabbitmq

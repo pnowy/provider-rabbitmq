@@ -154,7 +154,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	lateInitialize(&cr.Spec.ForProvider, apiUser)
 	isResourceLateInitialized := !cmp.Equal(current, &cr.Spec.ForProvider)
 
-	cr.Status.AtProvider = GenerateUserObservation(apiUser)
+	cr.Status.AtProvider = generateUserObservation(apiUser)
 	cr.Status.SetConditions(xpv1.Available())
 
 	password, err := c.resolveUserPassword(ctx, cr.Spec.ForProvider.UserSettings)
@@ -319,7 +319,7 @@ func lateInitialize(spec *v1alpha1.UserParameters, api *rabbithole.UserInfo) {
 	}
 }
 
-func GenerateUserObservation(apiUser *rabbithole.UserInfo) v1alpha1.UserObservation {
+func generateUserObservation(apiUser *rabbithole.UserInfo) v1alpha1.UserObservation {
 	if apiUser == nil {
 		return v1alpha1.UserObservation{}
 	}
