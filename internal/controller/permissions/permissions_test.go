@@ -25,15 +25,19 @@ import (
 
 	rabbithole "github.com/michaelklishin/rabbit-hole/v3"
 	pkgErrors "github.com/pkg/errors"
+	corev1 "k8s.io/api/core/v1"
 
+	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/google/go-cmp/cmp"
 	"github.com/pnowy/provider-rabbitmq/apis/core/v1alpha1"
+	apisv1alpha1 "github.com/pnowy/provider-rabbitmq/apis/v1alpha1"
 	"github.com/pnowy/provider-rabbitmq/internal/rabbitmqclient"
 	"github.com/pnowy/provider-rabbitmq/internal/rabbitmqclient/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // Unlike many Kubernetes projects Crossplane does not use third party testing
@@ -44,6 +48,248 @@ import (
 // https://github.com/golang/go/wiki/TestComments
 // https://github.com/crossplane/crossplane/blob/master/CONTRIBUTING.md#contributing-code
 
+func TestConnect(t *testing.T) {
+
+	type fields struct {
+		kube         client.Client
+		usage        resource.Tracker
+		newServiceFn func(creds []byte) (*rabbitmqclient.RabbitMqService, error)
+		logger       logging.Logger
+	}
+
+	type args struct {
+		ctx context.Context
+		mg  resource.Managed
+	}
+
+	cases := map[string]struct {
+		reason string
+		fields fields
+		args   args
+		want   error
+	}{
+		"Success": {
+			reason: "No error should be returned.",
+			fields: fields{
+				kube: &test.MockClient{
+					MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+						switch o := obj.(type) {
+						case *apisv1alpha1.ProviderConfig:
+							o.Spec.Credentials.Source = "Secret"
+							o.Spec.Credentials.SecretRef = &xpv1.SecretKeySelector{
+								Key: "creds",
+							}
+						case *corev1.Secret:
+							o.Data = map[string][]byte{
+								"creds": []byte("{\"APIKey\":\"foo\",\"Email\":\"foo@bar.com\"}"),
+							}
+						}
+						return nil
+					},
+				},
+				usage: &fake.MockTracker{
+					MockTrack: func(ctx context.Context, mg resource.Managed) error {
+						return nil
+					},
+				},
+				newServiceFn: func(creds []byte) (*rabbitmqclient.RabbitMqService, error) {
+					return &rabbitmqclient.RabbitMqService{}, nil
+				},
+				logger: &fake.MockLog{},
+			},
+			args: args{
+				mg: &v1alpha1.Permissions{
+					Spec: v1alpha1.PermissionsSpec{
+						ResourceSpec: xpv1.ResourceSpec{
+							ProviderConfigReference: &xpv1.Reference{
+								Name: "testing-provider-config",
+							},
+						},
+					},
+				},
+			},
+			want: nil,
+		},
+		"Error (No ProviderConfig)": {
+			reason: "Error should be returned.",
+			fields: fields{
+				kube: &test.MockClient{
+					MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+						switch o := obj.(type) {
+						case *apisv1alpha1.ProviderConfig:
+							return errors.New("no provider config")
+						case *corev1.Secret:
+							o.Data = map[string][]byte{
+								"creds": []byte("{\"APIKey\":\"foo\",\"Email\":\"foo@bar.com\"}"),
+							}
+						}
+						return nil
+					},
+				},
+				usage: &fake.MockTracker{
+					MockTrack: func(ctx context.Context, mg resource.Managed) error {
+						return nil
+					},
+				},
+				newServiceFn: func(creds []byte) (*rabbitmqclient.RabbitMqService, error) {
+					return &rabbitmqclient.RabbitMqService{}, nil
+				},
+				logger: &fake.MockLog{},
+			},
+			args: args{
+				mg: &v1alpha1.Permissions{
+					Spec: v1alpha1.PermissionsSpec{
+						ResourceSpec: xpv1.ResourceSpec{
+							ProviderConfigReference: &xpv1.Reference{
+								Name: "testing-provider-config",
+							},
+						},
+					},
+				},
+			},
+			want: pkgErrors.Wrap(errors.New("no provider config"), "cannot get ProviderConfig"),
+		},
+		"Error (No Secret)": {
+			reason: "Error should be returned.",
+			fields: fields{
+				kube: &test.MockClient{
+					MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+						switch o := obj.(type) {
+						case *apisv1alpha1.ProviderConfig:
+							o.Spec.Credentials.Source = "Secret"
+							o.Spec.Credentials.SecretRef = &xpv1.SecretKeySelector{
+								Key: "creds",
+							}
+						case *corev1.Secret:
+							return errors.New("no secret")
+						}
+						return nil
+					},
+				},
+				usage: &fake.MockTracker{
+					MockTrack: func(ctx context.Context, mg resource.Managed) error {
+						return nil
+					},
+				},
+				newServiceFn: func(creds []byte) (*rabbitmqclient.RabbitMqService, error) {
+					return &rabbitmqclient.RabbitMqService{}, nil
+				},
+				logger: &fake.MockLog{},
+			},
+			args: args{
+				mg: &v1alpha1.Permissions{
+					Spec: v1alpha1.PermissionsSpec{
+						ResourceSpec: xpv1.ResourceSpec{
+							ProviderConfigReference: &xpv1.Reference{
+								Name: "testing-provider-config",
+							},
+						},
+					},
+				},
+			},
+			want: pkgErrors.Wrap(errors.New("no secret"), "cannot get credentials: cannot get credentials secret"),
+		},
+		"Error in RabbitmqService": {
+			reason: "Error should be returned.",
+			fields: fields{
+				kube: &test.MockClient{
+					MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+						switch o := obj.(type) {
+						case *apisv1alpha1.ProviderConfig:
+							o.Spec.Credentials.Source = "Secret"
+							o.Spec.Credentials.SecretRef = &xpv1.SecretKeySelector{
+								Key: "creds",
+							}
+						case *corev1.Secret:
+							o.Data = map[string][]byte{
+								"creds": []byte("{\"APIKey\":\"foo\",\"Email\":\"foo@bar.com\"}"),
+							}
+						}
+						return nil
+					},
+				},
+				usage: &fake.MockTracker{
+					MockTrack: func(ctx context.Context, mg resource.Managed) error {
+						return nil
+					},
+				},
+				newServiceFn: func(creds []byte) (*rabbitmqclient.RabbitMqService, error) {
+					return &rabbitmqclient.RabbitMqService{}, errors.New("Error in RabbitmqService NewClient")
+				},
+				logger: &fake.MockLog{},
+			},
+			args: args{
+				mg: &v1alpha1.Permissions{
+					Spec: v1alpha1.PermissionsSpec{
+						ResourceSpec: xpv1.ResourceSpec{
+							ProviderConfigReference: &xpv1.Reference{
+								Name: "testing-provider-config",
+							},
+						},
+					},
+				},
+			},
+			want: pkgErrors.Wrap(errors.New("Error in RabbitmqService NewClient"), "cannot create new Service"),
+		},
+		"Error in Track": {
+			reason: "Error should be returned.",
+			fields: fields{
+				kube: &test.MockClient{
+					MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+						switch o := obj.(type) {
+						case *apisv1alpha1.ProviderConfig:
+							o.Spec.Credentials.Source = "Secret"
+							o.Spec.Credentials.SecretRef = &xpv1.SecretKeySelector{
+								Key: "creds",
+							}
+						case *corev1.Secret:
+							o.Data = map[string][]byte{
+								"creds": []byte("{\"APIKey\":\"foo\",\"Email\":\"foo@bar.com\"}"),
+							}
+						}
+						return nil
+					},
+				},
+				usage: &fake.MockTracker{
+					MockTrack: func(ctx context.Context, mg resource.Managed) error {
+						return errors.New("Error in Track")
+					},
+				},
+				newServiceFn: func(creds []byte) (*rabbitmqclient.RabbitMqService, error) {
+					return &rabbitmqclient.RabbitMqService{}, errors.New("Error in RabbitmqService NewClient")
+				},
+				logger: &fake.MockLog{},
+			},
+			args: args{
+				mg: &v1alpha1.Permissions{
+					Spec: v1alpha1.PermissionsSpec{
+						ResourceSpec: xpv1.ResourceSpec{
+							ProviderConfigReference: &xpv1.Reference{
+								Name: "testing-provider-config",
+							},
+						},
+					},
+				},
+			},
+			want: pkgErrors.Wrap(errors.New("Error in Track"), "cannot track ProviderConfig usage"),
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			e := &connector{
+				kube:         tc.fields.kube,
+				usage:        tc.fields.usage,
+				newServiceFn: tc.fields.newServiceFn,
+				logger:       tc.fields.logger,
+			}
+			_, err := e.Connect(tc.args.ctx, tc.args.mg)
+			if diff := cmp.Diff(tc.want, err, test.EquateErrors()); diff != "" {
+				t.Errorf("\n%s\ne.Connect(...): -want error, +got error:\n%s\n", tc.reason, diff)
+			}
+		})
+	}
+}
 func TestObserve(t *testing.T) {
 
 	type fields struct {
@@ -67,8 +313,8 @@ func TestObserve(t *testing.T) {
 		args   args
 		want   want
 	}{
-		"Create (success)": {
-			reason: "We should return ResourceExists: Since UserPermissions Exist in RabbitMQ server",
+		"Resource Exist and is up to date": {
+			reason: "We should return ResourceExists and ResourceUpToDate to true",
 			fields: fields{
 
 				service: &rabbitmqclient.RabbitMqService{Rmqc: &fake.MockClient{
@@ -265,7 +511,11 @@ func TestCreate(t *testing.T) {
 				service: &rabbitmqclient.RabbitMqService{Rmqc: &fake.MockClient{
 					MockUpdatePermissionsIn: func(vhost, username string, permissions rabbithole.Permissions) (res *http.Response, err error) {
 						res = &http.Response{StatusCode: 200,
-							Body: fake.MockReadCloser{}}
+							Body: fake.MockReadCloser{
+								MockClose: func() (err error) {
+									return nil
+								},
+							}}
 						return res, err
 					},
 				}},
@@ -299,7 +549,11 @@ func TestCreate(t *testing.T) {
 				service: &rabbitmqclient.RabbitMqService{Rmqc: &fake.MockClient{
 					MockUpdatePermissionsIn: func(vhost, username string, permissions rabbithole.Permissions) (res *http.Response, err error) {
 						res = &http.Response{StatusCode: 200,
-							Body: fake.MockReadCloser{}}
+							Body: fake.MockReadCloser{
+								MockClose: func() (err error) {
+									return nil
+								},
+							}}
 						err = errors.New("error")
 						return res, err
 					},
@@ -374,7 +628,11 @@ func TestUpdate(t *testing.T) {
 				service: &rabbitmqclient.RabbitMqService{Rmqc: &fake.MockClient{
 					MockUpdatePermissionsIn: func(vhost, username string, permissions rabbithole.Permissions) (res *http.Response, err error) {
 						res = &http.Response{StatusCode: 200,
-							Body: fake.MockReadCloser{}}
+							Body: fake.MockReadCloser{
+								MockClose: func() (err error) {
+									return nil
+								},
+							}}
 						return res, err
 					},
 				}},
@@ -408,7 +666,11 @@ func TestUpdate(t *testing.T) {
 				service: &rabbitmqclient.RabbitMqService{Rmqc: &fake.MockClient{
 					MockUpdatePermissionsIn: func(vhost, username string, permissions rabbithole.Permissions) (res *http.Response, err error) {
 						res = &http.Response{StatusCode: 200,
-							Body: fake.MockReadCloser{}}
+							Body: fake.MockReadCloser{
+								MockClose: func() (err error) {
+									return nil
+								},
+							}}
 						err = errors.New("error")
 						return res, err
 					},
@@ -481,7 +743,11 @@ func TestDelete(t *testing.T) {
 				service: &rabbitmqclient.RabbitMqService{Rmqc: &fake.MockClient{
 					MockClearPermissionsIn: func(vhost, username string) (res *http.Response, err error) {
 						res = &http.Response{StatusCode: 200,
-							Body: fake.MockReadCloser{}}
+							Body: fake.MockReadCloser{
+								MockClose: func() (err error) {
+									return nil
+								},
+							}}
 						return res, err
 					},
 				}},
@@ -513,7 +779,11 @@ func TestDelete(t *testing.T) {
 				service: &rabbitmqclient.RabbitMqService{Rmqc: &fake.MockClient{
 					MockClearPermissionsIn: func(vhost, username string) (res *http.Response, err error) {
 						res = &http.Response{StatusCode: 200,
-							Body: fake.MockReadCloser{}}
+							Body: fake.MockReadCloser{
+								MockClose: func() (err error) {
+									return nil
+								},
+							}}
 						err = errors.New("error")
 						return res, err
 					},

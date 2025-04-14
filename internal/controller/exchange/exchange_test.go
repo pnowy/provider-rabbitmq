@@ -18,15 +18,27 @@ package exchange
 
 import (
 	"context"
+	"errors"
+	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"testing"
 
-	"github.com/pnowy/provider-rabbitmq/internal/rabbitmqclient"
+	"net/http"
 
+	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/google/go-cmp/cmp"
 
+	rabbithole "github.com/michaelklishin/rabbit-hole/v3"
+	pkgErrors "github.com/pkg/errors"
+
+	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
-	"github.com/crossplane/crossplane-runtime/pkg/test"
+	"github.com/pnowy/provider-rabbitmq/apis/core/v1alpha1"
+	apisv1alpha1 "github.com/pnowy/provider-rabbitmq/apis/v1alpha1"
+	"github.com/pnowy/provider-rabbitmq/internal/rabbitmqclient"
+	"github.com/pnowy/provider-rabbitmq/internal/rabbitmqclient/fake"
+	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // Unlike many Kubernetes projects Crossplane does not use third party testing
@@ -37,9 +49,253 @@ import (
 // https://github.com/golang/go/wiki/TestComments
 // https://github.com/crossplane/crossplane/blob/master/CONTRIBUTING.md#contributing-code
 
+func TestConnect(t *testing.T) {
+
+	type fields struct {
+		kube         client.Client
+		usage        resource.Tracker
+		newServiceFn func(creds []byte) (*rabbitmqclient.RabbitMqService, error)
+		logger       logging.Logger
+	}
+
+	type args struct {
+		ctx context.Context
+		mg  resource.Managed
+	}
+
+	cases := map[string]struct {
+		reason string
+		fields fields
+		args   args
+		want   error
+	}{
+		"Success": {
+			reason: "No error should be returned.",
+			fields: fields{
+				kube: &test.MockClient{
+					MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+						switch o := obj.(type) {
+						case *apisv1alpha1.ProviderConfig:
+							o.Spec.Credentials.Source = "Secret"
+							o.Spec.Credentials.SecretRef = &xpv1.SecretKeySelector{
+								Key: "creds",
+							}
+						case *corev1.Secret:
+							o.Data = map[string][]byte{
+								"creds": []byte("{\"APIKey\":\"foo\",\"Email\":\"foo@bar.com\"}"),
+							}
+						}
+						return nil
+					},
+				},
+				usage: &fake.MockTracker{
+					MockTrack: func(ctx context.Context, mg resource.Managed) error {
+						return nil
+					},
+				},
+				newServiceFn: func(creds []byte) (*rabbitmqclient.RabbitMqService, error) {
+					return &rabbitmqclient.RabbitMqService{}, nil
+				},
+			},
+			args: args{
+				mg: &v1alpha1.Exchange{
+					Spec: v1alpha1.ExchangeSpec{
+						ResourceSpec: xpv1.ResourceSpec{
+							ProviderConfigReference: &xpv1.Reference{
+								Name: "testing-provider-config",
+							},
+						},
+					},
+				},
+			},
+			want: nil,
+		},
+		"Error (No ProviderConfig)": {
+			reason: "Error should be returned.",
+			fields: fields{
+				kube: &test.MockClient{
+					MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+						switch o := obj.(type) {
+						case *apisv1alpha1.ProviderConfig:
+							return errors.New("no provider config")
+						case *corev1.Secret:
+							o.Data = map[string][]byte{
+								"creds": []byte("{\"APIKey\":\"foo\",\"Email\":\"foo@bar.com\"}"),
+							}
+						}
+						return nil
+					},
+				},
+				usage: &fake.MockTracker{
+					MockTrack: func(ctx context.Context, mg resource.Managed) error {
+						return nil
+					},
+				},
+				newServiceFn: func(creds []byte) (*rabbitmqclient.RabbitMqService, error) {
+					return &rabbitmqclient.RabbitMqService{}, nil
+				},
+			},
+			args: args{
+				mg: &v1alpha1.Exchange{
+					Spec: v1alpha1.ExchangeSpec{
+						ResourceSpec: xpv1.ResourceSpec{
+							ProviderConfigReference: &xpv1.Reference{
+								Name: "testing-provider-config",
+							},
+						},
+					},
+				},
+			},
+			want: pkgErrors.Wrap(errors.New("no provider config"), "cannot get ProviderConfig"),
+		},
+		"Error (No Secret)": {
+			reason: "Error should be returned.",
+			fields: fields{
+				kube: &test.MockClient{
+					MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+						switch o := obj.(type) {
+						case *apisv1alpha1.ProviderConfig:
+							o.Spec.Credentials.Source = "Secret"
+							o.Spec.Credentials.SecretRef = &xpv1.SecretKeySelector{
+								Key: "creds",
+							}
+						case *corev1.Secret:
+							return errors.New("no secret")
+						}
+						return nil
+					},
+				},
+				usage: &fake.MockTracker{
+					MockTrack: func(ctx context.Context, mg resource.Managed) error {
+						return nil
+					},
+				},
+				newServiceFn: func(creds []byte) (*rabbitmqclient.RabbitMqService, error) {
+					return &rabbitmqclient.RabbitMqService{}, nil
+				},
+			},
+			args: args{
+				mg: &v1alpha1.Exchange{
+					Spec: v1alpha1.ExchangeSpec{
+						ResourceSpec: xpv1.ResourceSpec{
+							ProviderConfigReference: &xpv1.Reference{
+								Name: "testing-provider-config",
+							},
+						},
+					},
+				},
+			},
+			want: pkgErrors.Wrap(errors.New("no secret"), "cannot get credentials: cannot get credentials secret"),
+		},
+		"Error in RabbitmqService": {
+			reason: "Error should be returned.",
+			fields: fields{
+				kube: &test.MockClient{
+					MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+						switch o := obj.(type) {
+						case *apisv1alpha1.ProviderConfig:
+							o.Spec.Credentials.Source = "Secret"
+							o.Spec.Credentials.SecretRef = &xpv1.SecretKeySelector{
+								Key: "creds",
+							}
+						case *corev1.Secret:
+							o.Data = map[string][]byte{
+								"creds": []byte("{\"APIKey\":\"foo\",\"Email\":\"foo@bar.com\"}"),
+							}
+						}
+						return nil
+					},
+				},
+				usage: &fake.MockTracker{
+					MockTrack: func(ctx context.Context, mg resource.Managed) error {
+						return nil
+					},
+				},
+				newServiceFn: func(creds []byte) (*rabbitmqclient.RabbitMqService, error) {
+					return &rabbitmqclient.RabbitMqService{}, errors.New("Error in RabbitmqService NewClient")
+				},
+			},
+			args: args{
+				mg: &v1alpha1.Exchange{
+					Spec: v1alpha1.ExchangeSpec{
+						ResourceSpec: xpv1.ResourceSpec{
+							ProviderConfigReference: &xpv1.Reference{
+								Name: "testing-provider-config",
+							},
+						},
+					},
+				},
+			},
+			want: pkgErrors.Wrap(errors.New("Error in RabbitmqService NewClient"), "cannot create new Service"),
+		},
+		"Error in Track": {
+			reason: "Error should be returned.",
+			fields: fields{
+				kube: &test.MockClient{
+					MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+						switch o := obj.(type) {
+						case *apisv1alpha1.ProviderConfig:
+							o.Spec.Credentials.Source = "Secret"
+							o.Spec.Credentials.SecretRef = &xpv1.SecretKeySelector{
+								Key: "creds",
+							}
+						case *corev1.Secret:
+							o.Data = map[string][]byte{
+								"creds": []byte("{\"APIKey\":\"foo\",\"Email\":\"foo@bar.com\"}"),
+							}
+						}
+						return nil
+					},
+				},
+				usage: &fake.MockTracker{
+					MockTrack: func(ctx context.Context, mg resource.Managed) error {
+						return errors.New("Error in Track")
+					},
+				},
+				newServiceFn: func(creds []byte) (*rabbitmqclient.RabbitMqService, error) {
+					return &rabbitmqclient.RabbitMqService{}, errors.New("Error in RabbitmqService NewClient")
+				},
+			},
+			args: args{
+				mg: &v1alpha1.Exchange{
+					Spec: v1alpha1.ExchangeSpec{
+						ResourceSpec: xpv1.ResourceSpec{
+							ProviderConfigReference: &xpv1.Reference{
+								Name: "testing-provider-config",
+							},
+						},
+					},
+				},
+			},
+			want: pkgErrors.Wrap(errors.New("Error in Track"), "cannot track ProviderConfig usage"),
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			e := &connector{
+				kube:         tc.fields.kube,
+				usage:        tc.fields.usage,
+				newServiceFn: tc.fields.newServiceFn,
+			}
+			_, err := e.Connect(tc.args.ctx, tc.args.mg)
+			if diff := cmp.Diff(tc.want, err, test.EquateErrors()); diff != "" {
+				t.Errorf("\n%s\ne.Connect(...): -want error, +got error:\n%s\n", tc.reason, diff)
+			}
+		})
+	}
+}
 func TestObserve(t *testing.T) {
+
+	exchangeTestName := "example-exchange"
+	exchangeVhost := "example-exchange-vhost"
+	exchangeType := "fanout"
+	exchangeDurable := true
+	exchangeAutoDelete := true
+
 	type fields struct {
 		service *rabbitmqclient.RabbitMqService
+		logger  logging.Logger
 	}
 
 	type args struct {
@@ -58,13 +314,781 @@ func TestObserve(t *testing.T) {
 		args   args
 		want   want
 	}{
-		// TODO: Add test cases.
+		"Exchange exists and is up to date": {
+			reason: "We should return ResourceExists and ResourceUpToDate to true",
+			fields: fields{
+				service: &rabbitmqclient.RabbitMqService{
+					Rmqc: &fake.MockClient{
+						MockGetExchange: func(vhost, name string) (rec *rabbithole.DetailedExchangeInfo, err error) {
+							rec = &rabbithole.DetailedExchangeInfo{
+								Name:       name,
+								Vhost:      vhost,
+								Type:       exchangeType,
+								Durable:    exchangeDurable,
+								AutoDelete: exchangeAutoDelete,
+							}
+							return rec, err
+						},
+					},
+				},
+				logger: &fake.MockLog{},
+			},
+			args: args{
+				mg: &v1alpha1.Exchange{
+					Spec: v1alpha1.ExchangeSpec{
+						ForProvider: v1alpha1.ExchangeParameters{
+							Name:  &exchangeTestName,
+							Vhost: exchangeVhost,
+							ExchangeSettings: &v1alpha1.ExchangeSettings{
+								Type:       &exchangeType,
+								Durable:    &exchangeDurable,
+								AutoDelete: &exchangeAutoDelete,
+							},
+						},
+					},
+				},
+			},
+			want: want{
+				o: managed.ExternalObservation{
+					ResourceExists:          true,
+					ResourceLateInitialized: false,
+					ResourceUpToDate:        true,
+					ConnectionDetails:       managed.ConnectionDetails{},
+				},
+			},
+		},
+		"Exchange exists and is not up to date (type)": {
+			reason: "We should return ResourceExists and ResourceUpToDate to true",
+			fields: fields{
+				service: &rabbitmqclient.RabbitMqService{
+					Rmqc: &fake.MockClient{
+						MockGetExchange: func(vhost, name string) (rec *rabbithole.DetailedExchangeInfo, err error) {
+							rec = &rabbithole.DetailedExchangeInfo{
+								Name:       name,
+								Vhost:      vhost,
+								Type:       "direct",
+								Durable:    exchangeDurable,
+								AutoDelete: exchangeAutoDelete,
+							}
+							return rec, err
+						},
+					},
+				},
+				logger: &fake.MockLog{},
+			},
+			args: args{
+				mg: &v1alpha1.Exchange{
+					Spec: v1alpha1.ExchangeSpec{
+						ForProvider: v1alpha1.ExchangeParameters{
+							Name:  &exchangeTestName,
+							Vhost: exchangeVhost,
+							ExchangeSettings: &v1alpha1.ExchangeSettings{
+								Type:       &exchangeType,
+								Durable:    &exchangeDurable,
+								AutoDelete: &exchangeAutoDelete,
+							},
+						},
+					},
+				},
+			},
+			want: want{
+				o: managed.ExternalObservation{
+					ResourceExists:          true,
+					ResourceLateInitialized: false,
+					ResourceUpToDate:        false,
+					ConnectionDetails:       managed.ConnectionDetails{},
+				},
+			},
+		},
+		"Exchange exists and is not up to date (durable)": {
+			reason: "We should return ResourceExists and ResourceUpToDate to true",
+			fields: fields{
+				service: &rabbitmqclient.RabbitMqService{
+					Rmqc: &fake.MockClient{
+						MockGetExchange: func(vhost, name string) (rec *rabbithole.DetailedExchangeInfo, err error) {
+							rec = &rabbithole.DetailedExchangeInfo{
+								Name:       name,
+								Vhost:      vhost,
+								Type:       exchangeType,
+								Durable:    false,
+								AutoDelete: exchangeAutoDelete,
+							}
+							return rec, err
+						},
+					},
+				},
+				logger: &fake.MockLog{},
+			},
+			args: args{
+				mg: &v1alpha1.Exchange{
+					Spec: v1alpha1.ExchangeSpec{
+						ForProvider: v1alpha1.ExchangeParameters{
+							Name:  &exchangeTestName,
+							Vhost: exchangeVhost,
+							ExchangeSettings: &v1alpha1.ExchangeSettings{
+								Type:       &exchangeType,
+								Durable:    &exchangeDurable,
+								AutoDelete: &exchangeAutoDelete,
+							},
+						},
+					},
+				},
+			},
+			want: want{
+				o: managed.ExternalObservation{
+					ResourceExists:          true,
+					ResourceLateInitialized: false,
+					ResourceUpToDate:        false,
+					ConnectionDetails:       managed.ConnectionDetails{},
+				},
+			},
+		},
+		"Exchange exists and is not up to date (autoDelete)": {
+			reason: "We should return ResourceExists and ResourceUpToDate to true",
+			fields: fields{
+				service: &rabbitmqclient.RabbitMqService{
+					Rmqc: &fake.MockClient{
+						MockGetExchange: func(vhost, name string) (rec *rabbithole.DetailedExchangeInfo, err error) {
+							rec = &rabbithole.DetailedExchangeInfo{
+								Name:       name,
+								Vhost:      vhost,
+								Type:       exchangeType,
+								Durable:    exchangeDurable,
+								AutoDelete: false,
+							}
+							return rec, err
+						},
+					},
+				},
+				logger: &fake.MockLog{},
+			},
+			args: args{
+				mg: &v1alpha1.Exchange{
+					Spec: v1alpha1.ExchangeSpec{
+						ForProvider: v1alpha1.ExchangeParameters{
+							Name:  &exchangeTestName,
+							Vhost: exchangeVhost,
+							ExchangeSettings: &v1alpha1.ExchangeSettings{
+								Type:       &exchangeType,
+								Durable:    &exchangeDurable,
+								AutoDelete: &exchangeAutoDelete,
+							},
+						},
+					},
+				},
+			},
+			want: want{
+				o: managed.ExternalObservation{
+					ResourceExists:          true,
+					ResourceLateInitialized: false,
+					ResourceUpToDate:        false,
+					ConnectionDetails:       managed.ConnectionDetails{},
+				},
+			},
+		},
+		"Exchange doesn't exist": {
+			reason: "We should return ResourceExists and ResourceUpToDate to true",
+			fields: fields{
+				service: &rabbitmqclient.RabbitMqService{
+					Rmqc: &fake.MockClient{
+						MockGetExchange: func(vhost, name string) (rec *rabbithole.DetailedExchangeInfo, err error) {
+							var errResp rabbithole.ErrorResponse
+							errResp.StatusCode = http.StatusNotFound
+							errResp.Message = "exchange not found"
+							err = errResp
+							return nil, err
+						},
+					},
+				},
+				logger: &fake.MockLog{},
+			},
+			args: args{
+				mg: &v1alpha1.Exchange{
+					Spec: v1alpha1.ExchangeSpec{
+						ForProvider: v1alpha1.ExchangeParameters{
+							Name:  &exchangeTestName,
+							Vhost: exchangeVhost,
+							ExchangeSettings: &v1alpha1.ExchangeSettings{
+								Type:       &exchangeType,
+								Durable:    &exchangeDurable,
+								AutoDelete: &exchangeAutoDelete,
+							},
+						},
+					},
+				},
+			},
+			want: want{
+				o: managed.ExternalObservation{
+					ResourceExists: false,
+				},
+			},
+		},
 	}
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			e := external{service: tc.fields.service}
+			e := external{service: tc.fields.service, log: tc.fields.logger}
 			got, err := e.Observe(tc.args.ctx, tc.args.mg)
+			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
+				t.Errorf("\n%s\ne.Observe(...): -want error, +got error:\n%s\n", tc.reason, diff)
+			}
+			if diff := cmp.Diff(tc.want.o, got); diff != "" {
+				t.Errorf("\n%s\ne.Observe(...): -want, +got:\n%s\n", tc.reason, diff)
+			}
+		})
+	}
+}
+
+func TestCreate(t *testing.T) {
+
+	exchangeTestName := "example-exchange"
+	exchangeVhost := "example-exchange-vhost"
+	exchangeType := "fanout"
+	exchangeDurable := true
+	exchangeAutoDelete := true
+
+	type fields struct {
+		service *rabbitmqclient.RabbitMqService
+		logger  logging.Logger
+	}
+
+	type args struct {
+		ctx context.Context
+		mg  resource.Managed
+	}
+
+	type want struct {
+		o   managed.ExternalCreation
+		err error
+	}
+
+	cases := map[string]struct {
+		reason string
+		fields fields
+		args   args
+		want   want
+	}{
+		"Create succeeds": {
+			reason: "We should return managed.ConnectionDetails{}",
+			fields: fields{
+				service: &rabbitmqclient.RabbitMqService{
+					Rmqc: &fake.MockClient{
+						MockDeclareExchange: func(vhost, exchange string, info rabbithole.ExchangeSettings) (res *http.Response, err error) {
+							res = &http.Response{StatusCode: 200,
+								Body: fake.MockReadCloser{
+									MockClose: func() (err error) {
+										return nil
+									},
+								}}
+							return res, err
+						},
+					},
+				},
+				logger: &fake.MockLog{},
+			},
+			args: args{
+				mg: &v1alpha1.Exchange{
+					Spec: v1alpha1.ExchangeSpec{
+						ForProvider: v1alpha1.ExchangeParameters{
+							Name:  &exchangeTestName,
+							Vhost: exchangeVhost,
+							ExchangeSettings: &v1alpha1.ExchangeSettings{
+								Type:       &exchangeType,
+								Durable:    &exchangeDurable,
+								AutoDelete: &exchangeAutoDelete,
+							},
+						},
+					},
+				},
+			},
+			want: want{
+				o: managed.ExternalCreation{
+					ConnectionDetails: managed.ConnectionDetails{},
+				},
+			},
+		},
+		"Create succeeds (without settings)": {
+			reason: "We should return managed.ConnectionDetails{}",
+			fields: fields{
+				service: &rabbitmqclient.RabbitMqService{
+					Rmqc: &fake.MockClient{
+						MockDeclareExchange: func(vhost, exchange string, info rabbithole.ExchangeSettings) (res *http.Response, err error) {
+							res = &http.Response{StatusCode: 200,
+								Body: fake.MockReadCloser{
+									MockClose: func() (err error) {
+										return nil
+									},
+								}}
+							return res, err
+						},
+					},
+				},
+				logger: &fake.MockLog{},
+			},
+			args: args{
+				mg: &v1alpha1.Exchange{
+					Spec: v1alpha1.ExchangeSpec{
+						ForProvider: v1alpha1.ExchangeParameters{
+							Name:             &exchangeTestName,
+							Vhost:            exchangeVhost,
+							ExchangeSettings: nil,
+						},
+					},
+				},
+			},
+			want: want{
+				o: managed.ExternalCreation{
+					ConnectionDetails: managed.ConnectionDetails{},
+				},
+			},
+		},
+		"Create succeeds (without type)": {
+			reason: "We should return managed.ConnectionDetails{}",
+			fields: fields{
+				service: &rabbitmqclient.RabbitMqService{
+					Rmqc: &fake.MockClient{
+						MockDeclareExchange: func(vhost, exchange string, info rabbithole.ExchangeSettings) (res *http.Response, err error) {
+							res = &http.Response{StatusCode: 200,
+								Body: fake.MockReadCloser{
+									MockClose: func() (err error) {
+										return nil
+									},
+								}}
+							return res, err
+						},
+					},
+				},
+				logger: &fake.MockLog{},
+			},
+			args: args{
+				mg: &v1alpha1.Exchange{
+					Spec: v1alpha1.ExchangeSpec{
+						ForProvider: v1alpha1.ExchangeParameters{
+							Name:  &exchangeTestName,
+							Vhost: exchangeVhost,
+							ExchangeSettings: &v1alpha1.ExchangeSettings{
+								Type:       nil,
+								Durable:    &exchangeDurable,
+								AutoDelete: &exchangeAutoDelete,
+							},
+						},
+					},
+				},
+			},
+			want: want{
+				o: managed.ExternalCreation{
+					ConnectionDetails: managed.ConnectionDetails{},
+				},
+			},
+		},
+		"Create fails": {
+			reason: "We should return error",
+			fields: fields{
+				service: &rabbitmqclient.RabbitMqService{
+					Rmqc: &fake.MockClient{
+						MockDeclareExchange: func(vhost, exchange string, info rabbithole.ExchangeSettings) (res *http.Response, err error) {
+							res = &http.Response{StatusCode: 200,
+								Body: fake.MockReadCloser{
+									MockClose: func() (err error) {
+										return nil
+									},
+								}}
+							err = errors.New("error")
+							return res, err
+						},
+					},
+				},
+				logger: &fake.MockLog{},
+			},
+			args: args{
+				mg: &v1alpha1.Exchange{
+					Spec: v1alpha1.ExchangeSpec{
+						ForProvider: v1alpha1.ExchangeParameters{
+							Name:  &exchangeTestName,
+							Vhost: exchangeVhost,
+							ExchangeSettings: &v1alpha1.ExchangeSettings{
+								Type:       &exchangeType,
+								Durable:    &exchangeDurable,
+								AutoDelete: &exchangeAutoDelete,
+							},
+						},
+					},
+				},
+			},
+			want: want{
+				o: managed.ExternalCreation{
+					ConnectionDetails: nil,
+				},
+				err: pkgErrors.Wrap(errors.New("error"), "cannot create new Exchange"),
+			},
+		},
+		"Create succeeds with error body close": {
+			reason: "We should return managed.ConnectionDetails{}",
+			fields: fields{
+				service: &rabbitmqclient.RabbitMqService{
+					Rmqc: &fake.MockClient{
+						MockDeclareExchange: func(vhost, exchange string, info rabbithole.ExchangeSettings) (res *http.Response, err error) {
+							res = &http.Response{StatusCode: 200,
+								Body: fake.MockReadCloser{
+									MockClose: func() (err error) {
+										return errors.New("error")
+									},
+								}}
+							return res, nil
+						},
+					},
+				},
+				logger: &fake.MockLog{},
+			},
+			args: args{
+				mg: &v1alpha1.Exchange{
+					Spec: v1alpha1.ExchangeSpec{
+						ForProvider: v1alpha1.ExchangeParameters{
+							Name:  &exchangeTestName,
+							Vhost: exchangeVhost,
+							ExchangeSettings: &v1alpha1.ExchangeSettings{
+								Type:       &exchangeType,
+								Durable:    &exchangeDurable,
+								AutoDelete: &exchangeAutoDelete,
+							},
+						},
+					},
+				},
+			},
+			want: want{
+				o: managed.ExternalCreation{
+					ConnectionDetails: managed.ConnectionDetails{},
+				},
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			e := external{service: tc.fields.service, log: tc.fields.logger}
+			got, err := e.Create(tc.args.ctx, tc.args.mg)
+			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
+				t.Errorf("\n%s\ne.Create(...): -want error, +got error:\n%s\n", tc.reason, diff)
+			}
+			if diff := cmp.Diff(tc.want.o, got); diff != "" {
+				t.Errorf("\n%s\ne.Create(...): -want, +got:\n%s\n", tc.reason, diff)
+			}
+		})
+	}
+}
+
+func TestUpdate(t *testing.T) {
+
+	exchangeTestName := "example-exchange"
+	exchangeVhost := "example-exchange-vhost"
+	exchangeType := "fanout"
+	exchangeDurable := true
+	exchangeAutoDelete := true
+
+	type fields struct {
+		service *rabbitmqclient.RabbitMqService
+		logger  logging.Logger
+	}
+
+	type args struct {
+		ctx context.Context
+		mg  resource.Managed
+	}
+
+	type want struct {
+		o   managed.ExternalUpdate
+		err error
+	}
+
+	cases := map[string]struct {
+		reason string
+		fields fields
+		args   args
+		want   want
+	}{
+		"Update succeeds": {
+			reason: "We should return managed.ConnectionDetails{}",
+			fields: fields{
+				service: &rabbitmqclient.RabbitMqService{
+					Rmqc: &fake.MockClient{
+						MockDeclareExchange: func(vhost, exchange string, info rabbithole.ExchangeSettings) (res *http.Response, err error) {
+							res = &http.Response{StatusCode: 200,
+								Body: fake.MockReadCloser{
+									MockClose: func() (err error) {
+										return nil
+									},
+								}}
+							return res, err
+						},
+					},
+				},
+				logger: &fake.MockLog{},
+			},
+			args: args{
+				mg: &v1alpha1.Exchange{
+					Spec: v1alpha1.ExchangeSpec{
+						ForProvider: v1alpha1.ExchangeParameters{
+							Name:  &exchangeTestName,
+							Vhost: exchangeVhost,
+							ExchangeSettings: &v1alpha1.ExchangeSettings{
+								Type:       &exchangeType,
+								Durable:    &exchangeDurable,
+								AutoDelete: &exchangeAutoDelete,
+							},
+						},
+					},
+				},
+			},
+			want: want{
+				o: managed.ExternalUpdate{
+					ConnectionDetails: managed.ConnectionDetails{},
+				},
+			},
+		},
+		"Update fails": {
+			reason: "We should return error",
+			fields: fields{
+				service: &rabbitmqclient.RabbitMqService{
+					Rmqc: &fake.MockClient{
+						MockDeclareExchange: func(vhost, exchange string, info rabbithole.ExchangeSettings) (res *http.Response, err error) {
+							res = &http.Response{StatusCode: 200,
+								Body: fake.MockReadCloser{
+									MockClose: func() (err error) {
+										return nil
+									},
+								}}
+							err = errors.New("error")
+							return res, err
+						},
+					},
+				},
+				logger: &fake.MockLog{},
+			},
+			args: args{
+				mg: &v1alpha1.Exchange{
+					Spec: v1alpha1.ExchangeSpec{
+						ForProvider: v1alpha1.ExchangeParameters{
+							Name:  &exchangeTestName,
+							Vhost: exchangeVhost,
+							ExchangeSettings: &v1alpha1.ExchangeSettings{
+								Type:       &exchangeType,
+								Durable:    &exchangeDurable,
+								AutoDelete: &exchangeAutoDelete,
+							},
+						},
+					},
+				},
+			},
+			want: want{
+				o: managed.ExternalUpdate{
+					ConnectionDetails: nil,
+				},
+				err: pkgErrors.Wrap(errors.New("error"), "cannot update Exchange"),
+			},
+		},
+		"Update succeeds with error body close": {
+			reason: "We should return managed.ConnectionDetails{}",
+			fields: fields{
+				service: &rabbitmqclient.RabbitMqService{
+					Rmqc: &fake.MockClient{
+						MockDeclareExchange: func(vhost, exchange string, info rabbithole.ExchangeSettings) (res *http.Response, err error) {
+							res = &http.Response{StatusCode: 200,
+								Body: fake.MockReadCloser{
+									MockClose: func() (err error) {
+										return errors.New("error")
+									},
+								}}
+							return res, err
+						},
+					},
+				},
+				logger: &fake.MockLog{},
+			},
+			args: args{
+				mg: &v1alpha1.Exchange{
+					Spec: v1alpha1.ExchangeSpec{
+						ForProvider: v1alpha1.ExchangeParameters{
+							Name:  &exchangeTestName,
+							Vhost: exchangeVhost,
+							ExchangeSettings: &v1alpha1.ExchangeSettings{
+								Type:       &exchangeType,
+								Durable:    &exchangeDurable,
+								AutoDelete: &exchangeAutoDelete,
+							},
+						},
+					},
+				},
+			},
+			want: want{
+				o: managed.ExternalUpdate{
+					ConnectionDetails: managed.ConnectionDetails{},
+				},
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			e := external{service: tc.fields.service, log: tc.fields.logger}
+			got, err := e.Update(tc.args.ctx, tc.args.mg)
+			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
+				t.Errorf("\n%s\ne.Observe(...): -want error, +got error:\n%s\n", tc.reason, diff)
+			}
+			if diff := cmp.Diff(tc.want.o, got); diff != "" {
+				t.Errorf("\n%s\ne.Observe(...): -want, +got:\n%s\n", tc.reason, diff)
+			}
+		})
+	}
+}
+
+func TestDelete(t *testing.T) {
+
+	exchangeTestName := "example-exchange"
+	exchangeVhost := "example-exchange-vhost"
+	exchangeType := "fanout"
+	exchangeDurable := true
+	exchangeAutoDelete := true
+
+	type fields struct {
+		service *rabbitmqclient.RabbitMqService
+		logger  logging.Logger
+	}
+
+	type args struct {
+		ctx context.Context
+		mg  resource.Managed
+	}
+
+	type want struct {
+		o   managed.ExternalDelete
+		err error
+	}
+
+	cases := map[string]struct {
+		reason string
+		fields fields
+		args   args
+		want   want
+	}{
+		"Delete succeeds": {
+			reason: "We should return managed.ConnectionDetails{}",
+			fields: fields{
+				service: &rabbitmqclient.RabbitMqService{
+					Rmqc: &fake.MockClient{
+						MockDeleteExchange: func(vhost, exchange string) (res *http.Response, err error) {
+							res = &http.Response{StatusCode: 200,
+								Body: fake.MockReadCloser{
+									MockClose: func() (err error) {
+										return nil
+									},
+								}}
+							return res, err
+						},
+					},
+				},
+				logger: &fake.MockLog{},
+			},
+			args: args{
+				mg: &v1alpha1.Exchange{
+					Spec: v1alpha1.ExchangeSpec{
+						ForProvider: v1alpha1.ExchangeParameters{
+							Name:  &exchangeTestName,
+							Vhost: exchangeVhost,
+							ExchangeSettings: &v1alpha1.ExchangeSettings{
+								Type:       &exchangeType,
+								Durable:    &exchangeDurable,
+								AutoDelete: &exchangeAutoDelete,
+							},
+						},
+					},
+				},
+			},
+			want: want{
+				o: managed.ExternalDelete{},
+			},
+		},
+		"Delete fails": {
+			reason: "We should return ResourceExists and ResourceUpToDate to true",
+			fields: fields{
+				service: &rabbitmqclient.RabbitMqService{
+					Rmqc: &fake.MockClient{
+						MockDeleteExchange: func(vhost, exchange string) (res *http.Response, err error) {
+							res = &http.Response{StatusCode: 403,
+								Body: fake.MockReadCloser{
+									MockClose: func() (err error) {
+										return nil
+									},
+								}}
+							err = errors.New("error")
+							return res, err
+						},
+					},
+				},
+				logger: &fake.MockLog{},
+			},
+			args: args{
+				mg: &v1alpha1.Exchange{
+					Spec: v1alpha1.ExchangeSpec{
+						ForProvider: v1alpha1.ExchangeParameters{
+							Name:  &exchangeTestName,
+							Vhost: exchangeVhost,
+							ExchangeSettings: &v1alpha1.ExchangeSettings{
+								Type:       &exchangeType,
+								Durable:    &exchangeDurable,
+								AutoDelete: &exchangeAutoDelete,
+							},
+						},
+					},
+				},
+			},
+			want: want{
+				o:   managed.ExternalDelete{},
+				err: pkgErrors.Wrap(errors.New("error"), "cannot delete Exchange"),
+			},
+		},
+		"Delete succeeds with error body close": {
+			reason: "We should return managed.ConnectionDetails{}",
+			fields: fields{
+				service: &rabbitmqclient.RabbitMqService{
+					Rmqc: &fake.MockClient{
+						MockDeleteExchange: func(vhost, exchange string) (res *http.Response, err error) {
+							res = &http.Response{StatusCode: 200,
+								Body: fake.MockReadCloser{
+									MockClose: func() (err error) {
+										return errors.New("error")
+									},
+								}}
+							return res, err
+						},
+					},
+				},
+				logger: &fake.MockLog{},
+			},
+			args: args{
+				mg: &v1alpha1.Exchange{
+					Spec: v1alpha1.ExchangeSpec{
+						ForProvider: v1alpha1.ExchangeParameters{
+							Name:  &exchangeTestName,
+							Vhost: exchangeVhost,
+							ExchangeSettings: &v1alpha1.ExchangeSettings{
+								Type:       &exchangeType,
+								Durable:    &exchangeDurable,
+								AutoDelete: &exchangeAutoDelete,
+							},
+						},
+					},
+				},
+			},
+			want: want{
+				o: managed.ExternalDelete{},
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			e := external{service: tc.fields.service, log: tc.fields.logger}
+			got, err := e.Delete(tc.args.ctx, tc.args.mg)
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("\n%s\ne.Observe(...): -want error, +got error:\n%s\n", tc.reason, diff)
 			}

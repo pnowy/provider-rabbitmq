@@ -18,8 +18,6 @@ package exchange
 
 import (
 	"context"
-	"fmt"
-
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/google/go-cmp/cmp"
 	rabbithole "github.com/michaelklishin/rabbit-hole/v3"
@@ -32,6 +30,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/connection"
 	"github.com/crossplane/crossplane-runtime/pkg/controller"
 	"github.com/crossplane/crossplane-runtime/pkg/event"
+	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/crossplane/crossplane-runtime/pkg/ratelimiter"
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
@@ -42,15 +41,16 @@ import (
 )
 
 const (
-	errNotExchange  = "managed resource is not a Exchange custom resource"
-	errTrackPCUsage = "cannot track ProviderConfig usage"
-	errGetPC        = "cannot get ProviderConfig"
-	errGetCreds     = "cannot get credentials"
-	errGetFailed    = "cannot get RabbitMq Exchange"
-	errNewClient    = "cannot create new Service"
-	errCreateFailed = "cannot create new Exchange"
-	errDeleteFailed = "cannot delete Exchange"
-	errUpdateFailed = "cannot update Exchange"
+	errNotExchange        = "managed resource is not a Exchange custom resource"
+	errTrackPCUsage       = "cannot track ProviderConfig usage"
+	errGetPC              = "cannot get ProviderConfig"
+	errGetCreds           = "cannot get credentials"
+	errGetFailed          = "cannot get RabbitMq Exchange"
+	errNewClient          = "cannot create new Service"
+	errCreateFailed       = "cannot create new Exchange"
+	errDeleteFailed       = "cannot delete Exchange"
+	errUpdateFailed       = "cannot update Exchange"
+	EXCHANGE_DEFAULT_TYPE = "fanout"
 )
 
 // Setup adds a controller that reconciles Exchange managed resources.
@@ -67,7 +67,8 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 		managed.WithExternalConnecter(&connector{
 			kube:         mgr.GetClient(),
 			usage:        resource.NewProviderConfigUsageTracker(mgr.GetClient(), &apisv1alpha1.ProviderConfigUsage{}),
-			newServiceFn: rabbitmqclient.NewClient}),
+			newServiceFn: rabbitmqclient.NewClient,
+			logger:       o.Logger.WithValues("controller", name)}),
 		managed.WithLogger(o.Logger.WithValues("controller", name)),
 		managed.WithPollInterval(o.PollInterval),
 		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name))),
@@ -87,6 +88,7 @@ type connector struct {
 	kube         client.Client
 	usage        resource.Tracker
 	newServiceFn func(creds []byte) (*rabbitmqclient.RabbitMqService, error)
+	logger       logging.Logger
 }
 
 // Connect typically produces an ExternalClient by:
@@ -120,13 +122,14 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		return nil, errors.Wrap(err, errNewClient)
 	}
 
-	return &external{service: svc}, nil
+	return &external{service: svc, log: c.logger}, nil
 }
 
 // An ExternalClient observes, then either creates, updates, or deletes an
 // external resource to ensure it reflects the managed resource's desired state.
 type external struct {
 	service *rabbitmqclient.RabbitMqService
+	log     logging.Logger
 }
 
 func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
@@ -136,6 +139,8 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}
 
 	exchangeName := getExchangeName(cr)
+	c.log.Info("Observing exchange", "exchange", exchangeName)
+
 	apiExchange, err := c.service.Rmqc.GetExchange(cr.Spec.ForProvider.Vhost, exchangeName)
 
 	if err != nil {
@@ -154,7 +159,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 
 	isExchangeUptoDate := isUpToDate(&cr.Spec.ForProvider, apiExchange)
 
-	fmt.Printf("Reconciling exchange: %v (IsUpToDate: %v, LateInitializeVhost: %v)\n", exchangeName, isExchangeUptoDate, isResourceLateInitialized)
+	c.log.Debug("Reconciling exchange", "exchange", exchangeName, "current", current, "isUpToDate", isExchangeUptoDate)
 
 	return managed.ExternalObservation{
 		ResourceExists:          true,
@@ -170,7 +175,7 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, errors.New(errNotExchange)
 	}
 	exchangeName := getExchangeName(cr)
-	fmt.Printf("Creating exchange: %+v\n", exchangeName)
+	c.log.Info("Creating exchange", "exchange", exchangeName)
 
 	resp, err := c.service.Rmqc.DeclareExchange(cr.Spec.ForProvider.Vhost, exchangeName, generateExchangeOptions(cr.Spec.ForProvider.ExchangeSettings))
 
@@ -178,7 +183,7 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateFailed)
 	}
 	if err := resp.Body.Close(); err != nil {
-		fmt.Printf("Error closing response body: %v\n", err)
+		c.log.Debug(err.Error(), "failed to close response body")
 	}
 
 	return managed.ExternalCreation{
@@ -195,7 +200,7 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 	}
 
 	exchangeName := getExchangeName(cr)
-	fmt.Printf("Updating exchange: %+v\n", exchangeName)
+	c.log.Info("Updating exchange", "exchange", exchangeName)
 
 	resp, err := c.service.Rmqc.DeclareExchange(cr.Spec.ForProvider.Vhost, exchangeName, generateExchangeOptions(cr.Spec.ForProvider.ExchangeSettings))
 
@@ -203,7 +208,7 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdateFailed)
 	}
 	if err := resp.Body.Close(); err != nil {
-		fmt.Printf("Error closing response body: %v\n", err)
+		c.log.Debug(err.Error(), "failed to close response body")
 	}
 
 	return managed.ExternalUpdate{
@@ -220,15 +225,16 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 	}
 
 	exchangeName := getExchangeName(cr)
-	fmt.Printf("Deleting exchange: %+v\n", exchangeName)
+	c.log.Info("Deleting exchange", "exchange", exchangeName)
+
 	resp, err := c.service.Rmqc.DeleteExchange(cr.Spec.ForProvider.Vhost, exchangeName)
 
 	if err != nil {
-		fmt.Printf("Error deleting Exchange: %+v\n", err)
+		c.log.Debug(err.Error(), "failed to delete exchange", "exchange", exchangeName)
 		return managed.ExternalDelete{}, errors.Wrap(err, errDeleteFailed)
 	}
 	if err := resp.Body.Close(); err != nil {
-		fmt.Printf("Error closing response body: %v\n", err)
+		c.log.Debug(err.Error(), "failed to close response body")
 	}
 	return managed.ExternalDelete{}, nil
 }
@@ -265,7 +271,7 @@ func generateExchangeOptions(spec *v1alpha1.ExchangeSettings) rabbithole.Exchang
 	if spec == nil {
 		settings := rabbithole.ExchangeSettings{}
 		// Default value (Type is required in rabbitMq api)
-		settings.Type = "fanout"
+		settings.Type = EXCHANGE_DEFAULT_TYPE
 		return settings
 	}
 	settings := rabbithole.ExchangeSettings{}
@@ -273,7 +279,7 @@ func generateExchangeOptions(spec *v1alpha1.ExchangeSettings) rabbithole.Exchang
 		settings.Type = *spec.Type
 	} else {
 		// Default value (Type is required in rabbitMq api)
-		settings.Type = "fanout"
+		settings.Type = EXCHANGE_DEFAULT_TYPE
 	}
 
 	if spec.Durable != nil {
