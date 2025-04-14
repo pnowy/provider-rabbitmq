@@ -182,7 +182,7 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	if err := resp.Body.Close(); err != nil {
 		fmt.Printf("Error closing response body: %v\n", err)
 	}
-	meta.SetExternalName(cr, getExternalName(cr))
+	meta.SetExternalName(cr, name)
 	return managed.ExternalCreation{}, nil
 }
 

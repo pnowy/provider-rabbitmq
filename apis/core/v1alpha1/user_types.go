@@ -27,7 +27,7 @@ import (
 
 // UserParameters are the configurable fields of a User.
 type UserParameters struct {
-	Username     string        `json:"username"`
+	Username     *string       `json:"username,omitempty"`
 	UserSettings *UserSettings `json:"userSettings,omitempty"`
 }
 

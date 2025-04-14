@@ -139,10 +139,10 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errNotExchange)
 	}
 
-	exchangeName := getExchangeName(cr)
+	name := getExternalName(cr)
 	c.log.Info("Observing exchange", "exchange", exchangeName)
 
-	apiExchange, err := c.service.Rmqc.GetExchange(cr.Spec.ForProvider.Vhost, exchangeName)
+	apiExchange, err := c.service.Rmqc.GetExchange(cr.Spec.ForProvider.Vhost, name)
 
 	if err != nil {
 		if rabbitmqclient.IsNotFoundError(err) {
@@ -160,7 +160,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 
 	isExchangeUptoDate := isUpToDate(&cr.Spec.ForProvider, apiExchange)
 
-	c.log.Debug("Reconciling exchange", "exchange", exchangeName, "current", current, "isUpToDate", isExchangeUptoDate)
+	c.log.Debug("Reconciling exchange", "exchange", name, "current", current, "isUpToDate", isExchangeUptoDate)
 
 	return managed.ExternalObservation{
 		ResourceExists:          true,
@@ -175,10 +175,10 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	if !ok {
 		return managed.ExternalCreation{}, errors.New(errNotExchange)
 	}
-	exchangeName := getExchangeName(cr)
-	c.log.Info("Creating exchange", "exchange", exchangeName)
+	name := getExternalName(cr)
+	c.log.Info("Creating exchange", "exchange", name)
 
-	resp, err := c.service.Rmqc.DeclareExchange(cr.Spec.ForProvider.Vhost, exchangeName, generateExchangeOptions(cr.Spec.ForProvider.ExchangeSettings))
+	resp, err := c.service.Rmqc.DeclareExchange(cr.Spec.ForProvider.Vhost, name, generateExchangeOptions(cr.Spec.ForProvider.ExchangeSettings))
 
 	if err != nil {
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateFailed)
@@ -200,10 +200,10 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalUpdate{}, errors.New(errNotExchange)
 	}
 
-	exchangeName := getExchangeName(cr)
-	c.log.Info("Updating exchange", "exchange", exchangeName)
+	name := getExternalName(cr)
+	c.log.Info("Updating exchange", "exchange", name)
 
-	resp, err := c.service.Rmqc.DeclareExchange(cr.Spec.ForProvider.Vhost, exchangeName, generateExchangeOptions(cr.Spec.ForProvider.ExchangeSettings))
+	resp, err := c.service.Rmqc.DeclareExchange(cr.Spec.ForProvider.Vhost, name, generateExchangeOptions(cr.Spec.ForProvider.ExchangeSettings))
 
 	if err != nil {
 		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdateFailed)
@@ -225,10 +225,10 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalDelete{}, errors.New(errNotExchange)
 	}
 
-	exchangeName := getExchangeName(cr)
-	c.log.Info("Deleting exchange", "exchange", exchangeName)
+	name := getExternalName(cr)
+	c.log.Info("Deleting exchange", "exchange", name)
 
-	resp, err := c.service.Rmqc.DeleteExchange(cr.Spec.ForProvider.Vhost, exchangeName)
+	resp, err := c.service.Rmqc.DeleteExchange(cr.Spec.ForProvider.Vhost, name)
 
 	if err != nil {
 		c.log.Debug(err.Error(), "failed to delete exchange", "exchange", exchangeName)
@@ -308,7 +308,7 @@ func isUpToDate(spec *v1alpha1.ExchangeParameters, api *rabbithole.DetailedExcha
 	return true
 }
 
-func getExchangeName(spec *v1alpha1.Exchange) string {
+func getExternalName(spec *v1alpha1.Exchange) string {
 	forProviderName := spec.Spec.ForProvider.Name
 	if forProviderName != nil {
 		return *forProviderName

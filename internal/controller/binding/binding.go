@@ -139,7 +139,6 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 
 	// These fmt statements should be removed in the real implementation.
 	fmt.Printf("Observing binding: %+v\n", cr.Name)
-
 	bindings, err := listBindings(cr.Spec.ForProvider.Vhost, cr.Spec.ForProvider.Source, cr.Spec.ForProvider.Destination, cr.Spec.ForProvider.DestinationType, c.service)
 
 	if err != nil {
@@ -175,20 +174,9 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}
 
 	return managed.ExternalObservation{
-		// Return false when the external resource does not exist. This lets
-		// the managed resource reconciler know that it needs to call Create to
-		// (re)create the resource, or that it has successfully been deleted.
-		ResourceExists: true,
-
-		// Return false when the external resource exists, but it not up to date
-		// with the desired managed resource state. This lets the managed
-		// resource reconciler know that it needs to call Update.
-		ResourceUpToDate: isBindingUptoDate,
-
+		ResourceExists:          true,
+		ResourceUpToDate:        isBindingUptoDate,
 		ResourceLateInitialized: isResourceLateInitialized,
-		// Return any details that may be required to connect to the external
-		// resource. These will be stored as the connection secret.
-		ConnectionDetails: managed.ConnectionDetails{},
 	}, nil
 }
 
@@ -215,7 +203,7 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateFailed)
 	}
 	// Storing ID in external name
-	meta.SetExternalName(cr, getBindingExternalName(&cr.Spec.ForProvider, propertiesKey))
+	meta.SetExternalName(cr, getExternalName(&cr.Spec.ForProvider, propertiesKey))
 
 	if err := resp.Body.Close(); err != nil {
 		fmt.Printf("Error closing response body: %v\n", err)
@@ -229,7 +217,6 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 }
 
 func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
-	// TODO: ALL PARAMS ARE IMMUTABLE FROM NOW
 	return managed.ExternalUpdate{}, errors.New(errorUpdateNotSupported)
 }
 
@@ -345,6 +332,6 @@ func getBinding(bindings []rabbithole.BindingInfo, cr *v1alpha1.Binding) *rabbit
 	return nil
 }
 
-func getBindingExternalName(binding *v1alpha1.BindingParameters, propertiesKey string) string {
+func getExternalName(binding *v1alpha1.BindingParameters, propertiesKey string) string {
 	return binding.Vhost + "/" + binding.Source + "/" + binding.DestinationType + "/" + binding.Destination + "/" + propertiesKey
 }

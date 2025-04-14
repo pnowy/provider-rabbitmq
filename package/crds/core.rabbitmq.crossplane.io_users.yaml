@@ -102,8 +102,6 @@ spec:
                     type: object
                   username:
                     type: string
-                required:
-                - username
                 type: object
               managementPolicies:
                 default:
