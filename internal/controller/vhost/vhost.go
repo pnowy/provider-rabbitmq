@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/crossplane/crossplane-runtime/pkg/meta"
+
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -133,7 +135,8 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	if !ok {
 		return managed.ExternalObservation{}, errors.New(errNotVhost)
 	}
-	rmqVhost, err := c.service.Rmqc.GetVhost(cr.Spec.ForProvider.HostName)
+	name := getExternalName(cr)
+	rmqVhost, err := c.service.Rmqc.GetVhost(name)
 	if err != nil {
 		if rabbitmqclient.IsNotFoundError(err) {
 			return managed.ExternalObservation{
@@ -151,23 +154,12 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	cr.Status.SetConditions(xpv1.Available())
 
 	isUpToDate := isVhostUpToDate(&cr.Spec.ForProvider, rmqVhost)
-	fmt.Printf("Reconciling vhost: %v (IsUpToDate: %v, LateInitializeVhost: %v)\n", cr.Spec.ForProvider.HostName, isUpToDate, isResourceLateInitialized)
+	fmt.Printf("Reconciling vhost: %v (IsUpToDate: %v, LateInitializeVhost: %v)\n", name, isUpToDate, isResourceLateInitialized)
 
 	return managed.ExternalObservation{
-		// Return false when the external resource does not exist. This lets
-		// the managed resource reconciler know that it needs to call Create to
-		// (re)create the resource, or that it has successfully been deleted.
-		ResourceExists: true,
-		// Return false when the external resource exists, but it not up to date
-		// with the desired managed resource state. This lets the managed
-		// resource reconciler know that it needs to call Update.
-		ResourceUpToDate: isUpToDate,
-		// ResourceLateInitialized should be true if the managed resource's spec was
-		// updated during its observation.
+		ResourceExists:          true,
+		ResourceUpToDate:        isUpToDate,
 		ResourceLateInitialized: isResourceLateInitialized,
-		// Return any details that may be required to connect to the external
-		// resource. These will be stored as the connection secret.
-		ConnectionDetails: managed.ConnectionDetails{},
 	}, nil
 }
 
@@ -176,20 +168,18 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	if !ok {
 		return managed.ExternalCreation{}, errors.New(errNotVhost)
 	}
-	fmt.Printf("Creating vhost: %+v", cr.Spec.ForProvider.HostName)
-	resp, err := c.service.Rmqc.PutVhost(cr.Spec.ForProvider.HostName, generateApiVhostSettings(cr.Spec.ForProvider.VhostSettings))
+
+	name := getExternalName(cr)
+	fmt.Printf("Creating vhost: %+v", name)
+	resp, err := c.service.Rmqc.PutVhost(name, generateApiVhostSettings(cr.Spec.ForProvider.VhostSettings))
 	if err != nil {
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateFailed)
 	}
 	if err := resp.Body.Close(); err != nil {
 		fmt.Printf("Error closing response body: %v\n", err)
 	}
-
-	return managed.ExternalCreation{
-		// Optionally return any details that may be required to connect to the
-		// external resource. These will be stored as the connection secret.
-		ConnectionDetails: managed.ConnectionDetails{},
-	}, nil
+	meta.SetExternalName(cr, getExternalName(cr))
+	return managed.ExternalCreation{}, nil
 }
 
 func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
@@ -198,9 +188,10 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalUpdate{}, errors.New(errNotVhost)
 	}
 
-	fmt.Printf("Updating vhost: %+v\n", cr.Spec.ForProvider.HostName)
+	name := getExternalName(cr)
+	fmt.Printf("Updating vhost: %+v\n", name)
 	options := generateApiVhostSettings(cr.Spec.ForProvider.VhostSettings)
-	resp, err := c.service.Rmqc.PutVhost(cr.Spec.ForProvider.HostName, options)
+	resp, err := c.service.Rmqc.PutVhost(name, options)
 	if err != nil {
 		return managed.ExternalUpdate{}, errors.Wrap(err, errCreateFailed)
 	}
@@ -208,11 +199,7 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 		fmt.Printf("Error closing response body: %v\n", err)
 	}
 
-	return managed.ExternalUpdate{
-		// Optionally return any details that may be required to connect to the
-		// external resource. These will be stored as the connection secret.
-		ConnectionDetails: managed.ConnectionDetails{},
-	}, nil
+	return managed.ExternalUpdate{}, nil
 }
 
 func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.ExternalDelete, error) {
@@ -220,8 +207,10 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 	if !ok {
 		return managed.ExternalDelete{}, errors.New(errNotVhost)
 	}
-	fmt.Printf("Deleting vhost: %+v", cr.Spec.ForProvider.HostName)
-	resp, err := c.service.Rmqc.DeleteVhost(cr.Spec.ForProvider.HostName)
+
+	name := getExternalName(cr)
+	fmt.Printf("Deleting vhost: %+v", name)
+	resp, err := c.service.Rmqc.DeleteVhost(name)
 	if err != nil {
 		fmt.Printf("Error deleting Vhost: %+v\n", err)
 		return managed.ExternalDelete{}, errors.Wrap(err, errDeleteFailed)
@@ -234,6 +223,14 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 
 func (c *external) Disconnect(ctx context.Context) error {
 	return nil
+}
+
+func getExternalName(spec *v1alpha1.Vhost) string {
+	forProviderName := spec.Spec.ForProvider.HostName
+	if forProviderName != nil {
+		return *forProviderName
+	}
+	return spec.Name
 }
 
 // generateVhostObservation is used to produce v1alpha1.GroupGitLabObservation from gitlab.Group.
