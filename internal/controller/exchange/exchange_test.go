@@ -19,8 +19,9 @@ package exchange
 import (
 	"context"
 	"errors"
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"testing"
+
+	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 
 	"net/http"
 
@@ -55,7 +56,6 @@ func TestConnect(t *testing.T) {
 		kube         client.Client
 		usage        resource.Tracker
 		newServiceFn func(creds []byte) (*rabbitmqclient.RabbitMqService, error)
-		logger       logging.Logger
 	}
 
 	type args struct {
