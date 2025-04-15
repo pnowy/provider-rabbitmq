@@ -142,7 +142,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}
 
 	name := getExternalName(cr)
-	c.log.Info("Observing exchange", "exchange", exchangeName)
+	c.log.Info("Observing exchange", "exchange", name)
 
 	apiExchange, err := c.service.Rmqc.GetExchange(cr.Spec.ForProvider.Vhost, name)
 
@@ -193,7 +193,9 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	}
 
 	rabbitmqmeta.SetCrossplaneManaged(cr, name)
-	return managed.ExternalCreation{}, nil
+	return managed.ExternalCreation{
+		ConnectionDetails: managed.ConnectionDetails{},
+	}, nil
 }
 
 func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
@@ -214,7 +216,9 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 		c.log.Debug(err.Error(), "failed to close response body")
 	}
 
-	return managed.ExternalUpdate{}, nil
+	return managed.ExternalUpdate{
+		ConnectionDetails: managed.ConnectionDetails{},
+	}, nil
 }
 
 func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.ExternalDelete, error) {
@@ -229,7 +233,7 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 	resp, err := c.service.Rmqc.DeleteExchange(cr.Spec.ForProvider.Vhost, name)
 
 	if err != nil {
-		c.log.Debug(err.Error(), "failed to delete exchange", "exchange", exchangeName)
+		c.log.Debug(err.Error(), "failed to delete exchange", "exchange", name)
 		return managed.ExternalDelete{}, errors.Wrap(err, errDeleteFailed)
 	}
 	if err := resp.Body.Close(); err != nil {
