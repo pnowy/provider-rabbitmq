@@ -102,9 +102,10 @@ spec:
                     type: object
                   username:
                     type: string
-                required:
-                - username
                 type: object
+                x-kubernetes-validations:
+                - message: Username is immutable once set
+                  rule: '!has(oldSelf.username) || self.username == oldSelf.username'
               managementPolicies:
                 default:
                 - '*'

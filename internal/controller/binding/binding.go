@@ -22,11 +22,12 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/pnowy/provider-rabbitmq/internal/rabbitmqmeta"
+
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/connection"
 	"github.com/crossplane/crossplane-runtime/pkg/controller"
 	"github.com/crossplane/crossplane-runtime/pkg/event"
-	"github.com/crossplane/crossplane-runtime/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/pkg/ratelimiter"
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
@@ -43,16 +44,16 @@ import (
 )
 
 const (
-	errNotBinding                         = "managed resource is not a Binding custom resource"
-	errTrackPCUsage                       = "cannot track ProviderConfig usage"
-	errGetPC                              = "cannot get ProviderConfig"
-	errGetCreds                           = "cannot get credentials"
-	errNewClient                          = "cannot create new Service"
-	errGetFailed                          = "cannot get RabbitMq Binding"
-	errCreateFailed                       = "cannot create new Binding"
-	errDeleteFailed                       = "cannot delete Binding"
-	errorUpdateNotSupported               = "Binding cannot be updated. Please, Try to recreate it"
-	PROPERTIES_KEY_EXPECTED_PARTS_COUNTER = 5
+	errNotBinding                     = "managed resource is not a Binding custom resource"
+	errTrackPCUsage                   = "cannot track ProviderConfig usage"
+	errGetPC                          = "cannot get ProviderConfig"
+	errGetCreds                       = "cannot get credentials"
+	errNewClient                      = "cannot create new Service"
+	errGetFailed                      = "cannot get RabbitMq Binding"
+	errCreateFailed                   = "cannot create new Binding"
+	errDeleteFailed                   = "cannot delete Binding"
+	errorUpdateNotSupported           = "Binding cannot be updated. Please, Try to recreate it"
+	propertiesKeyExpectedPartsCounter = 5
 )
 
 // Setup adds a controller that reconciles Binding managed resources.
@@ -137,9 +138,8 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errNotBinding)
 	}
 
-	// These fmt statements should be removed in the real implementation.
-	fmt.Printf("Observing binding: %+v\n", cr.Name)
-
+	name := cr.Name
+	fmt.Printf("Observing binding: %+v\n", name)
 	bindings, err := listBindings(cr.Spec.ForProvider.Vhost, cr.Spec.ForProvider.Source, cr.Spec.ForProvider.Destination, cr.Spec.ForProvider.DestinationType, c.service)
 
 	if err != nil {
@@ -149,6 +149,9 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 			}, nil
 		}
 		return managed.ExternalObservation{}, errors.Wrap(err, errGetFailed)
+	}
+	if rabbitmqmeta.IsNotCrossplaneManaged(cr) {
+		return managed.ExternalObservation{}, rabbitmqmeta.NewNotCrossplaneManagedError(name)
 	}
 
 	bindingFound := false
@@ -166,7 +169,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		isBindingUptoDate = isUpToDate(&cr.Spec.ForProvider, binding)
 	}
 
-	fmt.Printf("Reconciling binding: %v (IsUpToDate: %v, LateInitializeBinding: %v)\n", cr.Name, isBindingUptoDate, isResourceLateInitialized)
+	fmt.Printf("Reconciling binding: %v (IsUpToDate: %v, LateInitializeBinding: %v)\n", name, isBindingUptoDate, isResourceLateInitialized)
 
 	if !bindingFound {
 		return managed.ExternalObservation{
@@ -175,20 +178,9 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}
 
 	return managed.ExternalObservation{
-		// Return false when the external resource does not exist. This lets
-		// the managed resource reconciler know that it needs to call Create to
-		// (re)create the resource, or that it has successfully been deleted.
-		ResourceExists: true,
-
-		// Return false when the external resource exists, but it not up to date
-		// with the desired managed resource state. This lets the managed
-		// resource reconciler know that it needs to call Update.
-		ResourceUpToDate: isBindingUptoDate,
-
+		ResourceExists:          true,
+		ResourceUpToDate:        isBindingUptoDate,
 		ResourceLateInitialized: isResourceLateInitialized,
-		// Return any details that may be required to connect to the external
-		// resource. These will be stored as the connection secret.
-		ConnectionDetails: managed.ConnectionDetails{},
 	}, nil
 }
 
@@ -214,22 +206,18 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	if err != nil {
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateFailed)
 	}
-	// Storing ID in external name
-	meta.SetExternalName(cr, getBindingExternalName(&cr.Spec.ForProvider, propertiesKey))
+
+	name := getExternalName(&cr.Spec.ForProvider, propertiesKey)
+	rabbitmqmeta.SetCrossplaneManaged(cr, name)
 
 	if err := resp.Body.Close(); err != nil {
 		fmt.Printf("Error closing response body: %v\n", err)
 	}
 
-	return managed.ExternalCreation{
-		// Optionally return any details that may be required to connect to the
-		// external resource. These will be stored as the connection secret.
-		ConnectionDetails: managed.ConnectionDetails{},
-	}, nil
+	return managed.ExternalCreation{}, nil
 }
 
 func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
-	// TODO: ALL PARAMS ARE IMMUTABLE FROM NOW
 	return managed.ExternalUpdate{}, errors.New(errorUpdateNotSupported)
 }
 
@@ -329,7 +317,7 @@ func getBinding(bindings []rabbithole.BindingInfo, cr *v1alpha1.Binding) *rabbit
 	id := strings.Split(cr.Annotations["crossplane.io/external-name"], "/")
 
 	// Checking if external name is updated with id
-	if len(id) < PROPERTIES_KEY_EXPECTED_PARTS_COUNTER {
+	if len(id) < propertiesKeyExpectedPartsCounter {
 		return nil
 	}
 
@@ -345,6 +333,6 @@ func getBinding(bindings []rabbithole.BindingInfo, cr *v1alpha1.Binding) *rabbit
 	return nil
 }
 
-func getBindingExternalName(binding *v1alpha1.BindingParameters, propertiesKey string) string {
+func getExternalName(binding *v1alpha1.BindingParameters, propertiesKey string) string {
 	return binding.Vhost + "/" + binding.Source + "/" + binding.DestinationType + "/" + binding.Destination + "/" + propertiesKey
 }

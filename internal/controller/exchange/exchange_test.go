@@ -21,6 +21,9 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/pnowy/provider-rabbitmq/internal/rabbitmqmeta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 
 	"net/http"
@@ -285,8 +288,8 @@ func TestConnect(t *testing.T) {
 		})
 	}
 }
-func TestObserve(t *testing.T) {
 
+func TestObserve(t *testing.T) {
 	exchangeTestName := "example-exchange"
 	exchangeVhost := "example-exchange-vhost"
 	exchangeType := "fanout"
@@ -335,6 +338,11 @@ func TestObserve(t *testing.T) {
 			},
 			args: args{
 				mg: &v1alpha1.Exchange{
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: map[string]string{
+							rabbitmqmeta.AnnotationKeyCrossplaneManaged: "true",
+						},
+					},
 					Spec: v1alpha1.ExchangeSpec{
 						ForProvider: v1alpha1.ExchangeParameters{
 							Name:  &exchangeTestName,
@@ -378,6 +386,11 @@ func TestObserve(t *testing.T) {
 			},
 			args: args{
 				mg: &v1alpha1.Exchange{
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: map[string]string{
+							rabbitmqmeta.AnnotationKeyCrossplaneManaged: "true",
+						},
+					},
 					Spec: v1alpha1.ExchangeSpec{
 						ForProvider: v1alpha1.ExchangeParameters{
 							Name:  &exchangeTestName,
@@ -421,6 +434,11 @@ func TestObserve(t *testing.T) {
 			},
 			args: args{
 				mg: &v1alpha1.Exchange{
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: map[string]string{
+							rabbitmqmeta.AnnotationKeyCrossplaneManaged: "true",
+						},
+					},
 					Spec: v1alpha1.ExchangeSpec{
 						ForProvider: v1alpha1.ExchangeParameters{
 							Name:  &exchangeTestName,
@@ -464,6 +482,11 @@ func TestObserve(t *testing.T) {
 			},
 			args: args{
 				mg: &v1alpha1.Exchange{
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: map[string]string{
+							rabbitmqmeta.AnnotationKeyCrossplaneManaged: "true",
+						},
+					},
 					Spec: v1alpha1.ExchangeSpec{
 						ForProvider: v1alpha1.ExchangeParameters{
 							Name:  &exchangeTestName,

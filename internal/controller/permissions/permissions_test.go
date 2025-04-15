@@ -21,6 +21,9 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/pnowy/provider-rabbitmq/internal/rabbitmqmeta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"net/http"
 
 	rabbithole "github.com/michaelklishin/rabbit-hole/v3"
@@ -316,7 +319,6 @@ func TestObserve(t *testing.T) {
 		"Resource Exist and is up to date": {
 			reason: "We should return ResourceExists and ResourceUpToDate to true",
 			fields: fields{
-
 				service: &rabbitmqclient.RabbitMqService{Rmqc: &fake.MockClient{
 					MockGetPermissionsIn: func(vhost, username string) (rec rabbithole.PermissionInfo, err error) {
 						rec = rabbithole.PermissionInfo{
@@ -333,6 +335,11 @@ func TestObserve(t *testing.T) {
 			},
 			args: args{
 				mg: &v1alpha1.Permissions{
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: map[string]string{
+							rabbitmqmeta.AnnotationKeyCrossplaneManaged: "true",
+						},
+					},
 					Spec: v1alpha1.PermissionsSpec{
 						ForProvider: v1alpha1.PermissionsParameters{
 							User:  "test",
@@ -375,6 +382,11 @@ func TestObserve(t *testing.T) {
 			},
 			args: args{
 				mg: &v1alpha1.Permissions{
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: map[string]string{
+							rabbitmqmeta.AnnotationKeyCrossplaneManaged: "true",
+						},
+					},
 					Spec: v1alpha1.PermissionsSpec{
 						ForProvider: v1alpha1.PermissionsParameters{
 							User:  "test",
@@ -426,7 +438,6 @@ func TestObserve(t *testing.T) {
 		"Resource Exists and is not up to date": {
 			reason: "We should return ResourceExists: Since UserPermissions Exist in RabbitMQ server",
 			fields: fields{
-
 				service: &rabbitmqclient.RabbitMqService{Rmqc: &fake.MockClient{
 					MockGetPermissionsIn: func(vhost, username string) (rec rabbithole.PermissionInfo, err error) {
 						rec = rabbithole.PermissionInfo{
@@ -443,6 +454,11 @@ func TestObserve(t *testing.T) {
 			},
 			args: args{
 				mg: &v1alpha1.Permissions{
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: map[string]string{
+							rabbitmqmeta.AnnotationKeyCrossplaneManaged: "true",
+						},
+					},
 					Spec: v1alpha1.PermissionsSpec{
 						ForProvider: v1alpha1.PermissionsParameters{
 							User:  "test",

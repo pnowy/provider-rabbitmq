@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/crossplane/crossplane-runtime/pkg/meta"
+	"github.com/pnowy/provider-rabbitmq/internal/rabbitmqmeta"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/google/go-cmp/cmp"
@@ -137,8 +137,8 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errNotQueue)
 	}
 
-	queueName := getQueueName(cr)
-	apiQueue, err := c.service.Rmqc.GetQueue(cr.Spec.ForProvider.Vhost, queueName)
+	name := getExternalName(cr)
+	apiQueue, err := c.service.Rmqc.GetQueue(cr.Spec.ForProvider.Vhost, name)
 	if err != nil {
 		if rabbitmqclient.IsNotFoundError(err) {
 			return managed.ExternalObservation{
@@ -146,6 +146,9 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 			}, nil
 		}
 		return managed.ExternalObservation{}, errors.Wrap(err, errGetFailed)
+	}
+	if rabbitmqmeta.IsNotCrossplaneManaged(cr) {
+		return managed.ExternalObservation{}, rabbitmqmeta.NewNotCrossplaneManagedError(name)
 	}
 	current := cr.Spec.ForProvider.DeepCopy()
 	lateInitialize(&cr.Spec.ForProvider, apiQueue)
@@ -156,7 +159,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 
 	isUptoDate := isUpToDate(&cr.Spec.ForProvider, apiQueue)
 
-	fmt.Printf("Reconciling queue: %v (IsUpToDate: %v, LateInitializeVhost: %v)\n", queueName, isUptoDate, isResourceLateInitialized)
+	fmt.Printf("Reconciling queue: %v (IsUpToDate: %v, LateInitializeVhost: %v)\n", name, isUptoDate, isResourceLateInitialized)
 
 	return managed.ExternalObservation{
 		ResourceExists:          true,
@@ -171,10 +174,10 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, errors.New(errNotQueue)
 	}
 
-	queueName := getQueueName(cr)
-	fmt.Printf("Creating queue: %+v\n", queueName)
+	name := getExternalName(cr)
+	fmt.Printf("Creating queue: %+v\n", name)
 
-	resp, err := c.service.Rmqc.DeclareQueue(cr.Spec.ForProvider.Vhost, queueName, generateQueueSettings(cr.Spec.ForProvider.QueueSettings))
+	resp, err := c.service.Rmqc.DeclareQueue(cr.Spec.ForProvider.Vhost, name, generateQueueSettings(cr.Spec.ForProvider.QueueSettings))
 
 	if err != nil {
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateFailed)
@@ -182,7 +185,7 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	if err := resp.Body.Close(); err != nil {
 		fmt.Printf("Error closing response body: %v\n", err)
 	}
-	meta.SetExternalName(cr, getQueueName(cr))
+	rabbitmqmeta.SetCrossplaneManaged(cr, name)
 	return managed.ExternalCreation{}, nil
 }
 
@@ -192,10 +195,10 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalUpdate{}, errors.New(errNotQueue)
 	}
 
-	queueName := getQueueName(cr)
-	fmt.Printf("Updating queue: %+v\n", queueName)
+	name := getExternalName(cr)
+	fmt.Printf("Updating queue: %+v\n", name)
 
-	resp, err := c.service.Rmqc.DeclareQueue(cr.Spec.ForProvider.Vhost, queueName, generateQueueSettings(cr.Spec.ForProvider.QueueSettings))
+	resp, err := c.service.Rmqc.DeclareQueue(cr.Spec.ForProvider.Vhost, name, generateQueueSettings(cr.Spec.ForProvider.QueueSettings))
 
 	if err != nil {
 		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdateFailed)
@@ -213,9 +216,9 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalDelete{}, errors.New(errNotQueue)
 	}
 
-	queueName := getQueueName(cr)
-	fmt.Printf("Deleting queue: %+v\n", queueName)
-	resp, err := c.service.Rmqc.DeleteQueue(cr.Spec.ForProvider.Vhost, queueName)
+	name := getExternalName(cr)
+	fmt.Printf("Deleting queue: %+v\n", name)
+	resp, err := c.service.Rmqc.DeleteQueue(cr.Spec.ForProvider.Vhost, name)
 
 	if err != nil {
 		fmt.Printf("Error deleting queue: %+v\n", err)
@@ -232,7 +235,7 @@ func (c *external) Disconnect(ctx context.Context) error {
 	return nil
 }
 
-func getQueueName(spec *v1alpha1.Queue) string {
+func getExternalName(spec *v1alpha1.Queue) string {
 	forProviderName := spec.Spec.ForProvider.Name
 	if forProviderName != nil {
 		return *forProviderName

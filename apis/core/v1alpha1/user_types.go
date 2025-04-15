@@ -26,8 +26,10 @@ import (
 )
 
 // UserParameters are the configurable fields of a User.
+// +kubebuilder:validation:Required
+// +kubebuilder:validation:XValidation:rule="!has(oldSelf.username) || self.username == oldSelf.username",message="Username is immutable once set"
 type UserParameters struct {
-	Username     string        `json:"username"`
+	Username     *string       `json:"username,omitempty"`
 	UserSettings *UserSettings `json:"userSettings,omitempty"`
 }
 

@@ -71,7 +71,7 @@ spec:
                 - Delete
                 type: string
               forProvider:
-                description: VhostParameters are the configurable fields of a Vhost.
+                description: VhostParameters are the configurable fields of a Vhost
                 properties:
                   hostName:
                     type: string
@@ -93,9 +93,10 @@ spec:
                         description: True if tracing should be enabled
                         type: boolean
                     type: object
-                required:
-                - hostName
                 type: object
+                x-kubernetes-validations:
+                - message: HostName is immutable once set
+                  rule: '!has(oldSelf.hostName) || self.hostName == oldSelf.hostName'
               managementPolicies:
                 default:
                 - '*'

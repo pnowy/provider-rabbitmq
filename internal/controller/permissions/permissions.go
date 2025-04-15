@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/pnowy/provider-rabbitmq/internal/rabbitmqmeta"
+
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
@@ -35,7 +37,6 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/connection"
 	"github.com/crossplane/crossplane-runtime/pkg/controller"
 	"github.com/crossplane/crossplane-runtime/pkg/event"
-	"github.com/crossplane/crossplane-runtime/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/pkg/ratelimiter"
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
@@ -143,8 +144,8 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errNotPermissions)
 	}
 
-	c.log.Info("Observing user permissions", "permissions", getPermissionsExternalName(&cr.Spec.ForProvider))
-
+	name := getExternalName(&cr.Spec.ForProvider)
+	c.log.Info("Observing user permissions", "permissions", name)
 	userPerms, err := c.service.Rmqc.GetPermissionsIn(cr.Spec.ForProvider.Vhost, cr.Spec.ForProvider.User)
 
 	if err != nil {
@@ -154,6 +155,9 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 			}, nil
 		}
 		return managed.ExternalObservation{}, errors.Wrap(err, errGetFailed)
+	}
+	if rabbitmqmeta.IsNotCrossplaneManaged(cr) {
+		return managed.ExternalObservation{}, rabbitmqmeta.NewNotCrossplaneManagedError(name)
 	}
 
 	current := cr.Spec.ForProvider.DeepCopy()
@@ -177,7 +181,8 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, errors.New(errNotPermissions)
 	}
 
-	c.log.Info("Creating user permissions", "permissions", getPermissionsExternalName(&cr.Spec.ForProvider))
+	name := getExternalName(&cr.Spec.ForProvider)
+	c.log.Info("Creating user permissions", "permissions", name)
 	userPerms := generatePermissionSettings(cr.Spec.ForProvider.PermissionSettings)
 	resp, err := c.service.Rmqc.UpdatePermissionsIn(cr.Spec.ForProvider.Vhost, cr.Spec.ForProvider.User, userPerms)
 
@@ -188,13 +193,9 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		fmt.Printf("Error closing response body: %v\n", err)
 	}
 
-	c.log.Debug("User permissions created in RabbitMQ server", "permissions", getPermissionsExternalName(&cr.Spec.ForProvider))
-
-	// Storing ID in external name
-	meta.SetExternalName(cr, getPermissionsExternalName(&cr.Spec.ForProvider))
+	c.log.Debug("User permissions created in RabbitMQ server", "permissions", name)
+	rabbitmqmeta.SetCrossplaneManaged(cr, name)
 	return managed.ExternalCreation{
-		// Optionally return any details that may be required to connect to the
-		// external resource. These will be stored as the connection secret.
 		ConnectionDetails: managed.ConnectionDetails{},
 	}, nil
 }
@@ -205,7 +206,8 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalUpdate{}, errors.New(errNotPermissions)
 	}
 
-	c.log.Info("Updating user permissions", "permissions", getPermissionsExternalName(&cr.Spec.ForProvider))
+	name := getExternalName(&cr.Spec.ForProvider)
+	c.log.Info("Updating user permissions", "permissions", name)
 
 	userPerms := generatePermissionSettings(cr.Spec.ForProvider.PermissionSettings)
 	resp, err := c.service.Rmqc.UpdatePermissionsIn(cr.Spec.ForProvider.Vhost, cr.Spec.ForProvider.User, userPerms)
@@ -217,11 +219,9 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 		fmt.Printf("Error closing response body: %v\n", err)
 	}
 
-	c.log.Debug("User permissions updated in RabbitMQ server", "permissions", getPermissionsExternalName(&cr.Spec.ForProvider))
+	c.log.Debug("User permissions updated in RabbitMQ server", "permissions", name)
 
 	return managed.ExternalUpdate{
-		// Optionally return any details that may be required to connect to the
-		// external resource. These will be stored as the connection secret.
 		ConnectionDetails: managed.ConnectionDetails{},
 	}, nil
 }
@@ -232,7 +232,8 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalDelete{}, errors.New(errNotPermissions)
 	}
 
-	c.log.Info("Deleting user permissions", "permissions", getPermissionsExternalName(&cr.Spec.ForProvider))
+	name := getExternalName(&cr.Spec.ForProvider)
+	c.log.Info("Deleting user permissions", "permissions", name)
 
 	resp, err := c.service.Rmqc.ClearPermissionsIn(cr.Spec.ForProvider.Vhost, cr.Spec.ForProvider.User)
 
@@ -243,7 +244,7 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 		fmt.Printf("Error closing response body: %v\n", err)
 	}
 
-	c.log.Debug("User permissions deleted in RabbitMQ server", "permissions", getPermissionsExternalName(&cr.Spec.ForProvider))
+	c.log.Debug("User permissions deleted in RabbitMQ server", "permissions", name)
 
 	return managed.ExternalDelete{}, nil
 }
@@ -298,6 +299,6 @@ func generatePermissionSettings(spec *v1alpha1.PermissionSettings) rabbithole.Pe
 	return userPerms
 }
 
-func getPermissionsExternalName(spec *v1alpha1.PermissionsParameters) string {
+func getExternalName(spec *v1alpha1.PermissionsParameters) string {
 	return spec.Vhost + "/" + spec.User
 }

@@ -25,9 +25,11 @@ import (
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 )
 
-// VhostParameters are the configurable fields of a Vhost.
+// VhostParameters are the configurable fields of a Vhost
+// +kubebuilder:validation:Required
+// +kubebuilder:validation:XValidation:rule="!has(oldSelf.hostName) || self.hostName == oldSelf.hostName",message="HostName is immutable once set"
 type VhostParameters struct {
-	HostName      string         `json:"hostName"`
+	HostName      *string        `json:"hostName,omitempty"`
 	VhostSettings *VhostSettings `json:"vhostSettings,omitempty"`
 }
 

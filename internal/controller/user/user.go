@@ -25,6 +25,8 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/pnowy/provider-rabbitmq/internal/rabbitmqmeta"
+
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -141,7 +143,8 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	if !ok {
 		return managed.ExternalObservation{}, errors.New(errNotUser)
 	}
-	apiUser, err := c.service.Rmqc.GetUser(cr.Spec.ForProvider.Username)
+	name := getExternalName(cr)
+	apiUser, err := c.service.Rmqc.GetUser(name)
 	if err != nil {
 		if rabbitmqclient.IsNotFoundError(err) {
 			return managed.ExternalObservation{
@@ -150,6 +153,10 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		}
 		return managed.ExternalObservation{}, errors.Wrap(err, errGetFailed)
 	}
+	if rabbitmqmeta.IsNotCrossplaneManaged(cr) {
+		return managed.ExternalObservation{}, rabbitmqmeta.NewNotCrossplaneManagedError(name)
+	}
+
 	current := cr.Spec.ForProvider.DeepCopy()
 	lateInitialize(&cr.Spec.ForProvider, apiUser)
 	isResourceLateInitialized := !cmp.Equal(current, &cr.Spec.ForProvider)
@@ -162,7 +169,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.Wrap(err, "cannot resolve password")
 	}
 	isUpToDate := isUpToDate(password, &cr.Spec.ForProvider, apiUser)
-	fmt.Printf("Reconciling user: %v (upToDate: %v, lateInitilize: %v)\n", cr.Spec.ForProvider.Username, isUpToDate, isResourceLateInitialized)
+	fmt.Printf("Reconciling user: %v (upToDate: %v, lateInitilize: %v)\n", name, isUpToDate, isResourceLateInitialized)
 
 	return managed.ExternalObservation{
 		ResourceExists:          true,
@@ -177,7 +184,8 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	if !ok {
 		return managed.ExternalCreation{}, errors.New(errNotUser)
 	}
-	fmt.Printf("Creating user: %+v\n", cr.Spec.ForProvider.Username)
+	name := getExternalName(cr)
+	fmt.Printf("Creating user: %+v\n", name)
 
 	password, err := c.resolveUserPassword(ctx, cr.Spec.ForProvider.UserSettings)
 	if err != nil {
@@ -186,14 +194,14 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 
 	var resp *http.Response
 	if password != "" {
-		resp, err = c.service.Rmqc.PutUser(cr.Spec.ForProvider.Username, generateApiUserSettings(&password, cr.Spec.ForProvider.UserSettings))
+		resp, err = c.service.Rmqc.PutUser(name, generateApiUserSettings(&password, cr.Spec.ForProvider.UserSettings))
 		if resp != nil {
 			if err := resp.Body.Close(); err != nil {
 				fmt.Printf("Error closing response body: %v\n", err)
 			}
 		}
 	} else {
-		resp, err = c.service.Rmqc.PutUserWithoutPassword(cr.Spec.ForProvider.Username, generateApiUserSettings(nil, cr.Spec.ForProvider.UserSettings))
+		resp, err = c.service.Rmqc.PutUserWithoutPassword(name, generateApiUserSettings(nil, cr.Spec.ForProvider.UserSettings))
 		if resp != nil {
 			if err := resp.Body.Close(); err != nil {
 				fmt.Printf("Error closing response body: %v\n", err)
@@ -204,7 +212,7 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		fmt.Printf("Error creating user: %v\n", err)
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateFailed)
 	}
-
+	rabbitmqmeta.SetCrossplaneManaged(cr, name)
 	return managed.ExternalCreation{}, nil
 }
 
@@ -213,21 +221,22 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 	if !ok {
 		return managed.ExternalUpdate{}, errors.New(errNotUser)
 	}
-	fmt.Printf("Updating user: %+v\n", cr.Spec.ForProvider.Username)
+	name := getExternalName(cr)
+	fmt.Printf("Updating user: %+v\n", name)
 	password, err := c.resolveUserPassword(ctx, cr.Spec.ForProvider.UserSettings)
 	if err != nil {
 		return managed.ExternalUpdate{}, errors.Wrap(err, "cannot determine password")
 	}
 	var resp *http.Response
 	if password != "" {
-		resp, err = c.service.Rmqc.PutUser(cr.Spec.ForProvider.Username, generateApiUserSettings(&password, cr.Spec.ForProvider.UserSettings))
+		resp, err = c.service.Rmqc.PutUser(name, generateApiUserSettings(&password, cr.Spec.ForProvider.UserSettings))
 		if resp != nil {
 			if err := resp.Body.Close(); err != nil {
 				fmt.Printf("Error closing response body: %v\n", err)
 			}
 		}
 	} else {
-		resp, err = c.service.Rmqc.PutUserWithoutPassword(cr.Spec.ForProvider.Username, generateApiUserSettings(nil, cr.Spec.ForProvider.UserSettings))
+		resp, err = c.service.Rmqc.PutUserWithoutPassword(name, generateApiUserSettings(nil, cr.Spec.ForProvider.UserSettings))
 		if resp != nil {
 			if err := resp.Body.Close(); err != nil {
 				fmt.Printf("Error closing response body: %v\n", err)
@@ -247,8 +256,9 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 	if !ok {
 		return managed.ExternalDelete{}, errors.New(errNotUser)
 	}
-	fmt.Printf("Deleting user: %+v", cr.Spec.ForProvider.Username)
-	resp, err := c.service.Rmqc.DeleteUser(cr.Spec.ForProvider.Username)
+	name := getExternalName(cr)
+	fmt.Printf("Deleting user: %+v", name)
+	resp, err := c.service.Rmqc.DeleteUser(name)
 	if err != nil {
 		fmt.Printf("Error deleting user: %+v\n", err)
 		return managed.ExternalDelete{}, errors.Wrap(err, errDeleteFailed)
@@ -261,6 +271,14 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 
 func (c *external) Disconnect(ctx context.Context) error {
 	return nil
+}
+
+func getExternalName(spec *v1alpha1.User) string {
+	forProviderName := spec.Spec.ForProvider.Username
+	if forProviderName != nil {
+		return *forProviderName
+	}
+	return spec.Name
 }
 
 func (c *external) resolveUserPassword(ctx context.Context, spec *v1alpha1.UserSettings) (string, error) {
