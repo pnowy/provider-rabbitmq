@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/pnowy/provider-rabbitmq/internal/rabbitmqmeta"
+
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
@@ -35,7 +37,6 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/connection"
 	"github.com/crossplane/crossplane-runtime/pkg/controller"
 	"github.com/crossplane/crossplane-runtime/pkg/event"
-	"github.com/crossplane/crossplane-runtime/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/pkg/ratelimiter"
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
@@ -143,8 +144,8 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errNotPermissions)
 	}
 
-	c.log.Info("Observing user permissions", "permissions", getExternalName(&cr.Spec.ForProvider))
-
+	name := getExternalName(&cr.Spec.ForProvider)
+	c.log.Info("Observing user permissions", "permissions", name)
 	userPerms, err := c.service.Rmqc.GetPermissionsIn(cr.Spec.ForProvider.Vhost, cr.Spec.ForProvider.User)
 
 	if err != nil {
@@ -154,6 +155,9 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 			}, nil
 		}
 		return managed.ExternalObservation{}, errors.Wrap(err, errGetFailed)
+	}
+	if rabbitmqmeta.IsNotCrossplaneManaged(cr) {
+		return managed.ExternalObservation{}, rabbitmqmeta.NewNotCrossplaneManagedError(name)
 	}
 
 	current := cr.Spec.ForProvider.DeepCopy()
@@ -190,12 +194,8 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	}
 
 	c.log.Debug("User permissions created in RabbitMQ server", "permissions", name)
-
-	// Storing ID in external name
-	meta.SetExternalName(cr, name)
+	rabbitmqmeta.SetCrossplaneManaged(cr, name)
 	return managed.ExternalCreation{
-		// Optionally return any details that may be required to connect to the
-		// external resource. These will be stored as the connection secret.
 		ConnectionDetails: managed.ConnectionDetails{},
 	}, nil
 }
@@ -222,8 +222,6 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 	c.log.Debug("User permissions updated in RabbitMQ server", "permissions", name)
 
 	return managed.ExternalUpdate{
-		// Optionally return any details that may be required to connect to the
-		// external resource. These will be stored as the connection secret.
 		ConnectionDetails: managed.ConnectionDetails{},
 	}, nil
 }

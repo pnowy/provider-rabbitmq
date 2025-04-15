@@ -25,7 +25,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/crossplane/crossplane-runtime/pkg/meta"
+	"github.com/pnowy/provider-rabbitmq/internal/rabbitmqmeta"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/google/go-cmp/cmp"
@@ -153,6 +153,10 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		}
 		return managed.ExternalObservation{}, errors.Wrap(err, errGetFailed)
 	}
+	if rabbitmqmeta.IsNotCrossplaneManaged(cr) {
+		return managed.ExternalObservation{}, rabbitmqmeta.NewNotCrossplaneManagedError(name)
+	}
+
 	current := cr.Spec.ForProvider.DeepCopy()
 	lateInitialize(&cr.Spec.ForProvider, apiUser)
 	isResourceLateInitialized := !cmp.Equal(current, &cr.Spec.ForProvider)
@@ -208,7 +212,7 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		fmt.Printf("Error creating user: %v\n", err)
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateFailed)
 	}
-	meta.SetExternalName(cr, name)
+	rabbitmqmeta.SetCrossplaneManaged(cr, name)
 	return managed.ExternalCreation{}, nil
 }
 
