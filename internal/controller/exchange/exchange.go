@@ -42,16 +42,16 @@ import (
 )
 
 const (
-	errNotExchange        = "managed resource is not a Exchange custom resource"
-	errTrackPCUsage       = "cannot track ProviderConfig usage"
-	errGetPC              = "cannot get ProviderConfig"
-	errGetCreds           = "cannot get credentials"
-	errGetFailed          = "cannot get RabbitMq Exchange"
-	errNewClient          = "cannot create new Service"
-	errCreateFailed       = "cannot create new Exchange"
-	errDeleteFailed       = "cannot delete Exchange"
-	errUpdateFailed       = "cannot update Exchange"
-	EXCHANGE_DEFAULT_TYPE = "fanout"
+	errNotExchange      = "managed resource is not a Exchange custom resource"
+	errTrackPCUsage     = "cannot track ProviderConfig usage"
+	errGetPC            = "cannot get ProviderConfig"
+	errGetCreds         = "cannot get credentials"
+	errGetFailed        = "cannot get RabbitMq Exchange"
+	errNewClient        = "cannot create new Service"
+	errCreateFailed     = "cannot create new Exchange"
+	errDeleteFailed     = "cannot delete Exchange"
+	errUpdateFailed     = "cannot update Exchange"
+	exchangeDefaultType = "fanout"
 )
 
 // Setup adds a controller that reconciles Exchange managed resources.
@@ -272,7 +272,7 @@ func generateExchangeOptions(spec *v1alpha1.ExchangeSettings) rabbithole.Exchang
 	if spec == nil {
 		settings := rabbithole.ExchangeSettings{}
 		// Default value (Type is required in rabbitMq api)
-		settings.Type = EXCHANGE_DEFAULT_TYPE
+		settings.Type = exchangeDefaultType
 		return settings
 	}
 	settings := rabbithole.ExchangeSettings{}
@@ -280,7 +280,7 @@ func generateExchangeOptions(spec *v1alpha1.ExchangeSettings) rabbithole.Exchang
 		settings.Type = *spec.Type
 	} else {
 		// Default value (Type is required in rabbitMq api)
-		settings.Type = EXCHANGE_DEFAULT_TYPE
+		settings.Type = exchangeDefaultType
 	}
 
 	if spec.Durable != nil {
