@@ -18,7 +18,6 @@ package permissions
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/pnowy/provider-rabbitmq/internal/rabbitmqmeta"
 
@@ -190,7 +189,7 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateFailed)
 	}
 	if err := resp.Body.Close(); err != nil {
-		fmt.Printf("Error closing response body: %v\n", err)
+		c.log.Debug("Error closing response body", "err", err)
 	}
 
 	c.log.Debug("User permissions created in RabbitMQ server", "permissions", name)
@@ -216,7 +215,7 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdateFailed)
 	}
 	if err := resp.Body.Close(); err != nil {
-		fmt.Printf("Error closing response body: %v\n", err)
+		c.log.Debug("Error closing response body", "err", err)
 	}
 
 	c.log.Debug("User permissions updated in RabbitMQ server", "permissions", name)
@@ -241,7 +240,7 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalDelete{}, errors.Wrap(err, errDeleteFailed)
 	}
 	if err := resp.Body.Close(); err != nil {
-		fmt.Printf("Error closing response body: %v\n", err)
+		c.log.Debug("Error closing response body", "err", err)
 	}
 
 	c.log.Debug("User permissions deleted in RabbitMQ server", "permissions", name)

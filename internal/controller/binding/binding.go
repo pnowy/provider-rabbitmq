@@ -18,9 +18,10 @@ package binding
 
 import (
 	"context"
-	"fmt"
 	"net/url"
 	"strings"
+
+	"github.com/crossplane/crossplane-runtime/pkg/logging"
 
 	"github.com/pnowy/provider-rabbitmq/internal/rabbitmqmeta"
 
@@ -90,6 +91,7 @@ type connector struct {
 	kube         client.Client
 	usage        resource.Tracker
 	newServiceFn func(creds []byte) (*rabbitmqclient.RabbitMqService, error)
+	logger       logging.Logger
 }
 
 // Connect typically produces an ExternalClient by:
@@ -123,13 +125,14 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		return nil, errors.Wrap(err, errNewClient)
 	}
 
-	return &external{service: svc}, nil
+	return &external{service: svc, log: c.logger}, nil
 }
 
 // An ExternalClient observes, then either creates, updates, or deletes an
 // external resource to ensure it reflects the managed resource's desired state.
 type external struct {
 	service *rabbitmqclient.RabbitMqService
+	log     logging.Logger
 }
 
 func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
@@ -139,7 +142,6 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}
 
 	name := cr.Name
-	fmt.Printf("Observing binding: %+v\n", name)
 	bindings, err := listBindings(cr.Spec.ForProvider.Vhost, cr.Spec.ForProvider.Source, cr.Spec.ForProvider.Destination, cr.Spec.ForProvider.DestinationType, c.service)
 
 	if err != nil {
@@ -169,7 +171,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		isBindingUptoDate = isUpToDate(&cr.Spec.ForProvider, binding)
 	}
 
-	fmt.Printf("Reconciling binding: %v (IsUpToDate: %v, LateInitializeBinding: %v)\n", name, isBindingUptoDate, isResourceLateInitialized)
+	c.log.Info("Reconciling binding", "binding", name, "upToDate", isBindingUptoDate, "lateInitialized", isResourceLateInitialized)
 
 	if !bindingFound {
 		return managed.ExternalObservation{
@@ -191,7 +193,7 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, errors.New(errNotBinding)
 	}
 
-	fmt.Printf("Creating binding: %+v\n", cr.Name)
+	c.log.Info("Creating binding", "binding", cr.Name)
 	bindingInfo := GenerateBindingInfo(&cr.Spec.ForProvider)
 	resp, err := c.service.Rmqc.DeclareBinding(cr.Spec.ForProvider.Vhost, bindingInfo)
 
@@ -211,7 +213,7 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	rabbitmqmeta.SetCrossplaneManaged(cr, name)
 
 	if err := resp.Body.Close(); err != nil {
-		fmt.Printf("Error closing response body: %v\n", err)
+		c.log.Debug("Error closing response body", "err", err)
 	}
 
 	return managed.ExternalCreation{}, nil
@@ -226,7 +228,7 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 	if !ok {
 		return managed.ExternalDelete{}, errors.New(errNotBinding)
 	}
-	fmt.Printf("Deleting binding: %+v\n", cr.Name)
+	c.log.Info("Deleting binding", "binding", cr.Name)
 
 	bindingInfo := GenerateBindingInfo(&cr.Spec.ForProvider)
 	// Getting Properties Keys from Status
@@ -234,11 +236,10 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 	resp, err := c.service.Rmqc.DeleteBinding(cr.Spec.ForProvider.Vhost, bindingInfo)
 
 	if err != nil {
-		fmt.Printf("Error deleting binding: %+v\n", err)
 		return managed.ExternalDelete{}, errors.Wrap(err, errDeleteFailed)
 	}
 	if err := resp.Body.Close(); err != nil {
-		fmt.Printf("Error closing response body: %v\n", err)
+		c.log.Debug("Error closing response body", "err", err)
 	}
 
 	return managed.ExternalDelete{}, nil
