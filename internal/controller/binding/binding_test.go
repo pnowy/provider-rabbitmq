@@ -657,10 +657,6 @@ func TestObserve(t *testing.T) {
 				service: &rabbitmqclient.RabbitMqService{
 					Rmqc: &fake.MockClient{
 						MockListQueueBindingsBetween: func(vhost, exchange string, queue string) (rec []rabbithole.BindingInfo, err error) {
-							var errResp rabbithole.ErrorResponse
-							errResp.StatusCode = http.StatusNotFound
-							errResp.Message = "exchange not found"
-							err = errResp
 							return rec, err
 						},
 					},

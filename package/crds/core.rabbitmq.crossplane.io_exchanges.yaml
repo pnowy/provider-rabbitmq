@@ -73,9 +73,9 @@ spec:
               forProvider:
                 description: ExchangeParameters are the configurable fields of a Exchange.
                 properties:
-                  exchange_settings:
+                  exchangeSettings:
                     properties:
-                      auto_delete:
+                      autoDelete:
                         type: boolean
                       durable:
                         type: boolean
@@ -262,7 +262,7 @@ spec:
               atProvider:
                 description: ExchangeObservation are the observable fields of a Exchange.
                 properties:
-                  auto_delete:
+                  autoDelete:
                     type: boolean
                   durable:
                     type: boolean

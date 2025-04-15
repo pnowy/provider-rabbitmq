@@ -6,9 +6,9 @@ spec:
   forProvider:
     vhost: demo
     source: myexchange
-    destination_type: queue
+    destinationType: queue
     destination: test
-    routing_key: "my-custom-key"
+    routingKey: "my-custom-key"
     arguments:
       test: test3
   providerConfigRef:
