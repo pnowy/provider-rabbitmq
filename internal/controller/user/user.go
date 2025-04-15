@@ -22,8 +22,9 @@ import (
 	"crypto/sha256"
 	"crypto/sha512"
 	"encoding/base64"
-	"fmt"
 	"net/http"
+
+	"github.com/crossplane/crossplane-runtime/pkg/logging"
 
 	"github.com/pnowy/provider-rabbitmq/internal/rabbitmqmeta"
 
@@ -77,7 +78,8 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 		managed.WithExternalConnecter(&connector{
 			kube:         mgr.GetClient(),
 			usage:        resource.NewProviderConfigUsageTracker(mgr.GetClient(), &apisv1alpha1.ProviderConfigUsage{}),
-			newServiceFn: rabbitmqclient.NewClient}),
+			newServiceFn: rabbitmqclient.NewClient,
+			logger:       o.Logger.WithValues("controller", name)}),
 		managed.WithLogger(o.Logger.WithValues("controller", name)),
 		managed.WithPollInterval(o.PollInterval),
 		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name))),
@@ -97,6 +99,7 @@ type connector struct {
 	kube         client.Client
 	usage        resource.Tracker
 	newServiceFn func(creds []byte) (*rabbitmqclient.RabbitMqService, error)
+	logger       logging.Logger
 }
 
 // Connect typically produces an ExternalClient by:
@@ -130,12 +133,13 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		return nil, errors.Wrap(err, errNewClient)
 	}
 
-	return &external{kube: c.kube, service: svc}, nil
+	return &external{kube: c.kube, service: svc, log: c.logger}, nil
 }
 
 type external struct {
 	kube    client.Client
 	service *rabbitmqclient.RabbitMqService
+	log     logging.Logger
 }
 
 func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
@@ -169,7 +173,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.Wrap(err, "cannot resolve password")
 	}
 	isUpToDate := isUpToDate(password, &cr.Spec.ForProvider, apiUser)
-	fmt.Printf("Reconciling user: %v (upToDate: %v, lateInitilize: %v)\n", name, isUpToDate, isResourceLateInitialized)
+	c.log.Info("Reconciling user", "username", name, "upToDate", isUpToDate, "lateInitialized", isResourceLateInitialized)
 
 	return managed.ExternalObservation{
 		ResourceExists:          true,
@@ -185,7 +189,8 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, errors.New(errNotUser)
 	}
 	name := getExternalName(cr)
-	fmt.Printf("Creating user: %+v\n", name)
+
+	c.log.Info("Creating user", "username", name)
 
 	password, err := c.resolveUserPassword(ctx, cr.Spec.ForProvider.UserSettings)
 	if err != nil {
@@ -197,19 +202,18 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		resp, err = c.service.Rmqc.PutUser(name, generateApiUserSettings(&password, cr.Spec.ForProvider.UserSettings))
 		if resp != nil {
 			if err := resp.Body.Close(); err != nil {
-				fmt.Printf("Error closing response body: %v\n", err)
+				c.log.Debug("Error closing response body", "err", err)
 			}
 		}
 	} else {
 		resp, err = c.service.Rmqc.PutUserWithoutPassword(name, generateApiUserSettings(nil, cr.Spec.ForProvider.UserSettings))
 		if resp != nil {
 			if err := resp.Body.Close(); err != nil {
-				fmt.Printf("Error closing response body: %v\n", err)
+				c.log.Debug("Error closing response body", "err", err)
 			}
 		}
 	}
 	if err != nil {
-		fmt.Printf("Error creating user: %v\n", err)
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateFailed)
 	}
 	rabbitmqmeta.SetCrossplaneManaged(cr, name)
@@ -222,7 +226,7 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalUpdate{}, errors.New(errNotUser)
 	}
 	name := getExternalName(cr)
-	fmt.Printf("Updating user: %+v\n", name)
+	c.log.Info("Updating user", "username", name)
 	password, err := c.resolveUserPassword(ctx, cr.Spec.ForProvider.UserSettings)
 	if err != nil {
 		return managed.ExternalUpdate{}, errors.Wrap(err, "cannot determine password")
@@ -232,14 +236,14 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 		resp, err = c.service.Rmqc.PutUser(name, generateApiUserSettings(&password, cr.Spec.ForProvider.UserSettings))
 		if resp != nil {
 			if err := resp.Body.Close(); err != nil {
-				fmt.Printf("Error closing response body: %v\n", err)
+				c.log.Debug("Error closing response body", "err", err)
 			}
 		}
 	} else {
 		resp, err = c.service.Rmqc.PutUserWithoutPassword(name, generateApiUserSettings(nil, cr.Spec.ForProvider.UserSettings))
 		if resp != nil {
 			if err := resp.Body.Close(); err != nil {
-				fmt.Printf("Error closing response body: %v\n", err)
+				c.log.Debug("Error closing response body", "err", err)
 			}
 		}
 	}
@@ -257,14 +261,13 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalDelete{}, errors.New(errNotUser)
 	}
 	name := getExternalName(cr)
-	fmt.Printf("Deleting user: %+v", name)
+	c.log.Info("Deleting user", "username", name)
 	resp, err := c.service.Rmqc.DeleteUser(name)
 	if err != nil {
-		fmt.Printf("Error deleting user: %+v\n", err)
 		return managed.ExternalDelete{}, errors.Wrap(err, errDeleteFailed)
 	}
 	if err := resp.Body.Close(); err != nil {
-		fmt.Printf("Error closing response body: %v\n", err)
+		c.log.Debug("Error closing response body", "err", err)
 	}
 	return managed.ExternalDelete{}, nil
 }

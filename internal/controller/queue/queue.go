@@ -18,7 +18,8 @@ package queue
 
 import (
 	"context"
-	"fmt"
+
+	"github.com/crossplane/crossplane-runtime/pkg/logging"
 
 	"github.com/pnowy/provider-rabbitmq/internal/rabbitmqmeta"
 
@@ -71,7 +72,8 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 		managed.WithExternalConnecter(&connector{
 			kube:         mgr.GetClient(),
 			usage:        resource.NewProviderConfigUsageTracker(mgr.GetClient(), &apisv1alpha1.ProviderConfigUsage{}),
-			newServiceFn: rabbitmqclient.NewClient}),
+			newServiceFn: rabbitmqclient.NewClient,
+			logger:       o.Logger.WithValues("controller", name)}),
 		managed.WithLogger(o.Logger.WithValues("controller", name)),
 		managed.WithPollInterval(o.PollInterval),
 		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name))),
@@ -91,6 +93,7 @@ type connector struct {
 	kube         client.Client
 	usage        resource.Tracker
 	newServiceFn func(creds []byte) (*rabbitmqclient.RabbitMqService, error)
+	logger       logging.Logger
 }
 
 // Connect typically produces an ExternalClient by:
@@ -124,11 +127,12 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		return nil, errors.Wrap(err, errNewClient)
 	}
 
-	return &external{service: svc}, nil
+	return &external{service: svc, log: c.logger}, nil
 }
 
 type external struct {
 	service *rabbitmqclient.RabbitMqService
+	log     logging.Logger
 }
 
 func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
@@ -159,7 +163,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 
 	isUptoDate := isUpToDate(&cr.Spec.ForProvider, apiQueue)
 
-	fmt.Printf("Reconciling queue: %v (IsUpToDate: %v, LateInitializeVhost: %v)\n", name, isUptoDate, isResourceLateInitialized)
+	c.log.Info("Reconciling queue", "queue", name, "upToDate", isUptoDate, "lateInitialized", isResourceLateInitialized)
 
 	return managed.ExternalObservation{
 		ResourceExists:          true,
@@ -175,7 +179,7 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	}
 
 	name := getExternalName(cr)
-	fmt.Printf("Creating queue: %+v\n", name)
+	c.log.Info("Creating queue", "queue", name)
 
 	resp, err := c.service.Rmqc.DeclareQueue(cr.Spec.ForProvider.Vhost, name, generateQueueSettings(cr.Spec.ForProvider.QueueSettings))
 
@@ -183,7 +187,7 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateFailed)
 	}
 	if err := resp.Body.Close(); err != nil {
-		fmt.Printf("Error closing response body: %v\n", err)
+		c.log.Debug("Error closing response body", "err", err)
 	}
 	rabbitmqmeta.SetCrossplaneManaged(cr, name)
 	return managed.ExternalCreation{}, nil
@@ -196,7 +200,7 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 	}
 
 	name := getExternalName(cr)
-	fmt.Printf("Updating queue: %+v\n", name)
+	c.log.Info("Updating queue", "queue", name)
 
 	resp, err := c.service.Rmqc.DeclareQueue(cr.Spec.ForProvider.Vhost, name, generateQueueSettings(cr.Spec.ForProvider.QueueSettings))
 
@@ -204,7 +208,7 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdateFailed)
 	}
 	if err := resp.Body.Close(); err != nil {
-		fmt.Printf("Error closing response body: %v\n", err)
+		c.log.Debug("Error closing response body", "err", err)
 	}
 
 	return managed.ExternalUpdate{}, nil
@@ -217,15 +221,14 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 	}
 
 	name := getExternalName(cr)
-	fmt.Printf("Deleting queue: %+v\n", name)
+	c.log.Info("Deleting queue", "queue", name)
 	resp, err := c.service.Rmqc.DeleteQueue(cr.Spec.ForProvider.Vhost, name)
 
 	if err != nil {
-		fmt.Printf("Error deleting queue: %+v\n", err)
 		return managed.ExternalDelete{}, errors.Wrap(err, errDeleteFailed)
 	}
 	if err := resp.Body.Close(); err != nil {
-		fmt.Printf("Error closing response body: %v\n", err)
+		c.log.Debug("Error closing response body", "err", err)
 	}
 
 	return managed.ExternalDelete{}, nil
