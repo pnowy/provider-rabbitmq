@@ -48,6 +48,7 @@ const (
 	errNotVhost     = "managed resource is not a Vhost custom resource"
 	errGetFailed    = "cannot get RabbitMq vhost"
 	errCreateFailed = "cannot create RabbitMq vhost"
+	errUpdateFailed = "cannot update RabbitMq vhost"
 	errDeleteFailed = "cannot delete RabbitMq vhost"
 	errTrackPCUsage = "cannot track ProviderConfig usage"
 	errGetPC        = "cannot get ProviderConfig"
@@ -198,7 +199,7 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 	options := generateApiVhostSettings(cr.Spec.ForProvider.VhostSettings)
 	resp, err := c.service.Rmqc.PutVhost(name, options)
 	if err != nil {
-		return managed.ExternalUpdate{}, errors.Wrap(err, errCreateFailed)
+		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdateFailed)
 	}
 	if err := resp.Body.Close(); err != nil {
 		c.log.Debug("Error closing response body", "err", err)

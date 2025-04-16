@@ -429,3 +429,119 @@ func TestCreate(t *testing.T) {
 		})
 	}
 }
+
+func TestUpdate(t *testing.T) {
+	vHostTestName := "example-vhost"
+	defaultQueueType := "classic"
+	defaultTracing := false
+	defaultDescription := "example-description"
+	modifiedDescription := "modified-description"
+
+	type fields struct {
+		service *rabbitmqclient.RabbitMqService
+		logger  logging.Logger
+	}
+
+	type args struct {
+		ctx context.Context
+		mg  resource.Managed
+	}
+
+	type want struct {
+		o   managed.ExternalUpdate
+		err error
+	}
+
+	cases := map[string]struct {
+		reason string
+		fields fields
+		args   args
+		want   want
+	}{
+		"Update succeeds": {
+			reason: "Should return managed.ExternalUpdate{} on success",
+			fields: fields{
+				service: &rabbitmqclient.RabbitMqService{
+					Rmqc: &fake.MockClient{
+						MockPutVhost: func(name string, settings rabbithole.VhostSettings) (res *http.Response, err error) {
+							res = &http.Response{StatusCode: 204,
+								Body: fake.MockReadCloser{
+									MockClose: func() (err error) {
+										return nil
+									},
+								}}
+							return res, nil
+						},
+					},
+				},
+				logger: &fake.MockLog{},
+			},
+			args: args{
+				mg: &v1alpha1.Vhost{
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: map[string]string{
+							rabbitmqmeta.AnnotationKeyCrossplaneManaged: "true",
+						},
+					},
+					Spec: v1alpha1.VhostSpec{
+						ForProvider: v1alpha1.VhostParameters{
+							HostName: &vHostTestName,
+							VhostSettings: &v1alpha1.VhostSettings{
+								DefaultQueueType: &defaultQueueType,
+								Tracing:          &defaultTracing,
+								Description:      &modifiedDescription,
+							},
+						},
+					},
+				},
+			},
+			want: want{
+				o: managed.ExternalUpdate{},
+			},
+		},
+		"Update fails": {
+			reason: "Should return error if client returns error",
+			fields: fields{
+				service: &rabbitmqclient.RabbitMqService{
+					Rmqc: &fake.MockClient{
+						MockPutVhost: func(name string, settings rabbithole.VhostSettings) (res *http.Response, err error) {
+							res = &http.Response{StatusCode: 500}
+							return res, errors.New("update error")
+						},
+					},
+				},
+				logger: &fake.MockLog{},
+			},
+			args: args{
+				mg: &v1alpha1.Vhost{
+					Spec: v1alpha1.VhostSpec{
+						ForProvider: v1alpha1.VhostParameters{
+							HostName: &vHostTestName,
+							VhostSettings: &v1alpha1.VhostSettings{
+								DefaultQueueType: &defaultQueueType,
+								Tracing:          &defaultTracing,
+								Description:      &defaultDescription,
+							},
+						},
+					},
+				},
+			},
+			want: want{
+				err: errors.Wrap(errors.New("update error"), errUpdateFailed),
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			e := external{service: tc.fields.service, log: tc.fields.logger}
+			got, err := e.Update(tc.args.ctx, tc.args.mg)
+			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
+				t.Errorf("\n%s\ne.Update(...): -want error, +got error:\n%s\n", tc.reason, diff)
+			}
+			if diff := cmp.Diff(tc.want.o, got); diff != "" {
+				t.Errorf("\n%s\ne.Update(...): -want, +got:\n%s\n", tc.reason, diff)
+			}
+		})
+	}
+}
