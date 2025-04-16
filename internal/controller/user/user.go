@@ -59,6 +59,7 @@ const (
 	errGetPC        = "cannot get ProviderConfig"
 	errGetCreds     = "cannot get credentials"
 	errCreateFailed = "cannot create RabbitMq user"
+	errUpdateFailed = "cannot update RabbitMq user"
 	errDeleteFailed = "cannot delete RabbitMq user"
 
 	errNewClient = "cannot create new Service"
@@ -247,11 +248,9 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 		}
 	}
 	if err != nil {
-		return managed.ExternalUpdate{}, errors.Wrap(err, errCreateFailed)
+		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdateFailed)
 	}
-	return managed.ExternalUpdate{
-		ConnectionDetails: managed.ConnectionDetails{},
-	}, nil
+	return managed.ExternalUpdate{}, nil
 }
 
 func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.ExternalDelete, error) {
