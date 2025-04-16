@@ -179,7 +179,6 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		ResourceExists:          true,
 		ResourceUpToDate:        isUpToDate,
 		ResourceLateInitialized: isResourceLateInitialized,
-		ConnectionDetails:       managed.ConnectionDetails{},
 	}, nil
 }
 
