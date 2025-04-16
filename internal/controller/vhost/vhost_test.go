@@ -545,3 +545,119 @@ func TestUpdate(t *testing.T) {
 		})
 	}
 }
+
+func TestDelete(t *testing.T) {
+	vHostTestName := "example-vhost"
+	defaultQueueType := "classic"
+	defaultTracing := false
+	defaultDescription := "example-description"
+
+	type fields struct {
+		service *rabbitmqclient.RabbitMqService
+		logger  logging.Logger
+	}
+
+	type args struct {
+		ctx context.Context
+		mg  resource.Managed
+	}
+
+	type want struct {
+		o   managed.ExternalDelete
+		err error
+	}
+
+	cases := map[string]struct {
+		reason string
+		fields fields
+		args   args
+		want   want
+	}{
+		"Delete succeeds": {
+			reason: "We should return managed.ExternalDelete{} on success",
+			fields: fields{
+				service: &rabbitmqclient.RabbitMqService{
+					Rmqc: &fake.MockClient{
+						MockDeleteVhost: func(name string) (res *http.Response, err error) {
+							res = &http.Response{StatusCode: 204,
+								Body: fake.MockReadCloser{
+									MockClose: func() error {
+										return nil
+									},
+								}}
+							return res, nil
+						},
+					},
+				},
+				logger: &fake.MockLog{},
+			},
+			args: args{
+				mg: &v1alpha1.Vhost{
+					Spec: v1alpha1.VhostSpec{
+						ForProvider: v1alpha1.VhostParameters{
+							HostName: &vHostTestName,
+							VhostSettings: &v1alpha1.VhostSettings{
+								DefaultQueueType: &defaultQueueType,
+								Tracing:          &defaultTracing,
+								Description:      &defaultDescription,
+							},
+						},
+					},
+				},
+			},
+			want: want{
+				o: managed.ExternalDelete{},
+			},
+		},
+		"Delete fails": {
+			reason: "Should return error if delete operation fails",
+			fields: fields{
+				service: &rabbitmqclient.RabbitMqService{
+					Rmqc: &fake.MockClient{
+						MockDeleteVhost: func(name string) (res *http.Response, err error) {
+							res = &http.Response{StatusCode: 403,
+								Body: fake.MockReadCloser{
+									MockClose: func() error {
+										return nil
+									},
+								}}
+							return res, errors.New("delete error")
+						},
+					},
+				},
+				logger: &fake.MockLog{},
+			},
+			args: args{
+				mg: &v1alpha1.Vhost{
+					Spec: v1alpha1.VhostSpec{
+						ForProvider: v1alpha1.VhostParameters{
+							HostName: &vHostTestName,
+							VhostSettings: &v1alpha1.VhostSettings{
+								DefaultQueueType: &defaultQueueType,
+								Tracing:          &defaultTracing,
+								Description:      &defaultDescription,
+							},
+						},
+					},
+				},
+			},
+			want: want{
+				o:   managed.ExternalDelete{},
+				err: errors.Wrap(errors.New("delete error"), errDeleteFailed),
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			e := external{service: tc.fields.service, log: tc.fields.logger}
+			got, err := e.Delete(tc.args.ctx, tc.args.mg)
+			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
+				t.Errorf("\n%s\ne.Delete(...): -want error, +got error:\n%s\n", tc.reason, diff)
+			}
+			if diff := cmp.Diff(tc.want.o, got); diff != "" {
+				t.Errorf("\n%s\ne.Delete(...): -want, +got:\n%s\n", tc.reason, diff)
+			}
+		})
+	}
+}
