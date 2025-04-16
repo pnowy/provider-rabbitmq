@@ -28,7 +28,7 @@ type MockClient struct {
 	MockDeleteUser             func(username string) (res *http.Response, err error)
 	// Vhost
 	MockGetVhost    func(vhostname string) (rec *rabbithole.VhostInfo, err error)
-	MockPutHost     func(vhostname string, settings rabbithole.VhostSettings) (res *http.Response, err error)
+	MockPutVhost    func(vhostname string, settings rabbithole.VhostSettings) (res *http.Response, err error)
 	MockDeleteVhost func(vhost string) (res *http.Response, err error)
 	// Queue
 	MockGetQueue     func(vhost, queue string) (rec *rabbithole.DetailedQueueInfo, err error)
@@ -110,7 +110,7 @@ func (m MockClient) GetVhost(vhostname string) (rec *rabbithole.VhostInfo, err e
 }
 
 func (m MockClient) PutVhost(vhostname string, settings rabbithole.VhostSettings) (res *http.Response, err error) {
-	return m.MockPutHost(vhostname, settings)
+	return m.MockPutVhost(vhostname, settings)
 }
 
 func (m MockClient) DeleteVhost(vhostname string) (res *http.Response, err error) {
