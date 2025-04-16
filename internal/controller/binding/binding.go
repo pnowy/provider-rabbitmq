@@ -71,7 +71,8 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 		managed.WithExternalConnecter(&connector{
 			kube:         mgr.GetClient(),
 			usage:        resource.NewProviderConfigUsageTracker(mgr.GetClient(), &apisv1alpha1.ProviderConfigUsage{}),
-			newServiceFn: rabbitmqclient.NewClient}),
+			newServiceFn: rabbitmqclient.NewClient,
+			logger:       o.Logger.WithValues("controller", name)}),
 		managed.WithLogger(o.Logger.WithValues("controller", name)),
 		managed.WithPollInterval(o.PollInterval),
 		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name))),
@@ -145,13 +146,15 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	bindings, err := listBindings(cr.Spec.ForProvider.Vhost, cr.Spec.ForProvider.Source, cr.Spec.ForProvider.Destination, cr.Spec.ForProvider.DestinationType, c.service)
 
 	if err != nil {
-		if rabbitmqclient.IsNotFoundError(err) {
-			return managed.ExternalObservation{
-				ResourceExists: false,
-			}, nil
-		}
 		return managed.ExternalObservation{}, errors.Wrap(err, errGetFailed)
 	}
+
+	if len(bindings) == 0 {
+		return managed.ExternalObservation{
+			ResourceExists: false,
+		}, nil
+	}
+
 	if rabbitmqmeta.IsNotCrossplaneManaged(cr) {
 		return managed.ExternalObservation{}, rabbitmqmeta.NewNotCrossplaneManagedError(name)
 	}

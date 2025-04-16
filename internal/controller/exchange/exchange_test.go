@@ -55,6 +55,9 @@ import (
 
 func TestConnect(t *testing.T) {
 
+	const (
+		credentialsSource = "Secret"
+	)
 	type fields struct {
 		kube         client.Client
 		usage        resource.Tracker
@@ -271,6 +274,37 @@ func TestConnect(t *testing.T) {
 				},
 			},
 			want: pkgErrors.Wrap(errors.New("Error in Track"), "cannot track ProviderConfig usage"),
+		},
+		"Resource No found error ": {
+			reason: "We should return error",
+			fields: fields{
+				kube: &test.MockClient{
+					MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+						switch o := obj.(type) {
+						case *apisv1alpha1.ProviderConfig:
+							o.Spec.Credentials.Source = credentialsSource
+							o.Spec.Credentials.SecretRef = &xpv1.SecretKeySelector{
+								Key: "creds",
+							}
+						case *corev1.Secret:
+							o.Data = map[string][]byte{
+								"creds": []byte("{\"APIKey\":\"foo\",\"Email\":\"foo@bar.com\"}"),
+							}
+						}
+						return nil
+					},
+				},
+				usage: &fake.MockTracker{
+					MockTrack: func(ctx context.Context, mg resource.Managed) error {
+						return nil
+					},
+				},
+				newServiceFn: func(creds []byte) (*rabbitmqclient.RabbitMqService, error) {
+					return &rabbitmqclient.RabbitMqService{}, nil
+				},
+			},
+			args: args{},
+			want: pkgErrors.New(errNotExchange),
 		},
 	}
 
@@ -546,6 +580,22 @@ func TestObserve(t *testing.T) {
 				},
 			},
 		},
+		"Resource No found error ": {
+			reason: "We should return error",
+			fields: fields{
+				service: &rabbitmqclient.RabbitMqService{
+					Rmqc: &fake.MockClient{},
+				},
+				logger: &fake.MockLog{},
+			},
+			args: args{},
+			want: want{
+				o: managed.ExternalObservation{
+					ResourceExists: false,
+				},
+				err: pkgErrors.New(errNotExchange),
+			},
+		},
 	}
 
 	for name, tc := range cases {
@@ -784,6 +834,20 @@ func TestCreate(t *testing.T) {
 				},
 			},
 		},
+		"Resource No found error ": {
+			reason: "We should return error",
+			fields: fields{
+				service: &rabbitmqclient.RabbitMqService{
+					Rmqc: &fake.MockClient{},
+				},
+				logger: &fake.MockLog{},
+			},
+			args: args{},
+			want: want{
+				o:   managed.ExternalCreation{},
+				err: pkgErrors.New(errNotExchange),
+			},
+		},
 	}
 
 	for name, tc := range cases {
@@ -948,6 +1012,20 @@ func TestUpdate(t *testing.T) {
 				},
 			},
 		},
+		"Resource No found error ": {
+			reason: "We should return error",
+			fields: fields{
+				service: &rabbitmqclient.RabbitMqService{
+					Rmqc: &fake.MockClient{},
+				},
+				logger: &fake.MockLog{},
+			},
+			args: args{},
+			want: want{
+				o:   managed.ExternalUpdate{},
+				err: pkgErrors.New(errNotExchange),
+			},
+		},
 	}
 
 	for name, tc := range cases {
@@ -955,10 +1033,10 @@ func TestUpdate(t *testing.T) {
 			e := external{service: tc.fields.service, log: tc.fields.logger}
 			got, err := e.Update(tc.args.ctx, tc.args.mg)
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
-				t.Errorf("\n%s\ne.Observe(...): -want error, +got error:\n%s\n", tc.reason, diff)
+				t.Errorf("\n%s\ne.Update(...): -want error, +got error:\n%s\n", tc.reason, diff)
 			}
 			if diff := cmp.Diff(tc.want.o, got); diff != "" {
-				t.Errorf("\n%s\ne.Observe(...): -want, +got:\n%s\n", tc.reason, diff)
+				t.Errorf("\n%s\ne.Update(...): -want, +got:\n%s\n", tc.reason, diff)
 			}
 		})
 	}
@@ -1106,6 +1184,20 @@ func TestDelete(t *testing.T) {
 				o: managed.ExternalDelete{},
 			},
 		},
+		"Resource No found error ": {
+			reason: "We should return error",
+			fields: fields{
+				service: &rabbitmqclient.RabbitMqService{
+					Rmqc: &fake.MockClient{},
+				},
+				logger: &fake.MockLog{},
+			},
+			args: args{},
+			want: want{
+				o:   managed.ExternalDelete{},
+				err: pkgErrors.New(errNotExchange),
+			},
+		},
 	}
 
 	for name, tc := range cases {
@@ -1113,10 +1205,10 @@ func TestDelete(t *testing.T) {
 			e := external{service: tc.fields.service, log: tc.fields.logger}
 			got, err := e.Delete(tc.args.ctx, tc.args.mg)
 			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
-				t.Errorf("\n%s\ne.Observe(...): -want error, +got error:\n%s\n", tc.reason, diff)
+				t.Errorf("\n%s\ne.Delete(...): -want error, +got error:\n%s\n", tc.reason, diff)
 			}
 			if diff := cmp.Diff(tc.want.o, got); diff != "" {
-				t.Errorf("\n%s\ne.Observe(...): -want, +got:\n%s\n", tc.reason, diff)
+				t.Errorf("\n%s\ne.Delete(...): -want, +got:\n%s\n", tc.reason, diff)
 			}
 		})
 	}

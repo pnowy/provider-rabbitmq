@@ -29,16 +29,16 @@ import (
 // +kubebuilder:validation:Required
 // +kubebuilder:validation:XValidation:rule="!has(oldSelf.destination) || self.destination == oldSelf.destination",message="Destination is immutable once set"
 // +kubebuilder:validation:XValidation:rule="!has(oldSelf.vhost) || self.vhost == oldSelf.vhost",message="Vhost is immutable once set"
-// +kubebuilder:validation:XValidation:rule="!has(oldSelf.destination_type) || self.destination_type == oldSelf.destination_type",message="Destination Type is immutable once set"
+// +kubebuilder:validation:XValidation:rule="!has(oldSelf.destinationType) || self.destinationType == oldSelf.destinationType",message="Destination Type is immutable once set"
 // +kubebuilder:validation:XValidation:rule="!has(oldSelf.source) || self.source == oldSelf.source",message="Source is immutable once set"
-// +kubebuilder:validation:XValidation:rule="!has(oldSelf.routing_key) || self.routing_key == oldSelf.routing_key",message="Routing Key is immutable once set"
+// +kubebuilder:validation:XValidation:rule="!has(oldSelf.routingKey) || self.routingKey == oldSelf.routingKey",message="Routing Key is immutable once set"
 // +kubebuilder:validation:XValidation:rule="!has(oldSelf.arguments) || self.arguments == oldSelf.arguments",message="Arguments are immutable once set"
 type BindingParameters struct {
 	Source          string            `json:"source"`
 	Vhost           string            `json:"vhost"`
 	Destination     string            `json:"destination"`
-	DestinationType string            `json:"destination_type"`
-	RoutingKey      string            `json:"routing_key"`
+	DestinationType string            `json:"destinationType"`
+	RoutingKey      string            `json:"routingKey"`
 	Arguments       map[string]string `json:"arguments,omitempty"`
 }
 
@@ -47,9 +47,9 @@ type BindingObservation struct {
 	Source          string            `json:"source"`
 	Vhost           string            `json:"vhost"`
 	Destination     string            `json:"destination"`
-	DestinationType string            `json:"destination_type"`
-	RoutingKey      string            `json:"routing_key"`
-	PropertiesKey   string            `json:"properties_key"`
+	DestinationType string            `json:"destinationType"`
+	RoutingKey      string            `json:"routingKey"`
+	PropertiesKey   string            `json:"propertiesKey"`
 	Arguments       map[string]string `json:"arguments"`
 }
 

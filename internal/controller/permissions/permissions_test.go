@@ -53,6 +53,9 @@ import (
 
 func TestConnect(t *testing.T) {
 
+	const (
+		credentialsSource = "Secret"
+	)
 	type fields struct {
 		kube         client.Client
 		usage        resource.Tracker
@@ -276,6 +279,38 @@ func TestConnect(t *testing.T) {
 			},
 			want: pkgErrors.Wrap(errors.New("Error in Track"), "cannot track ProviderConfig usage"),
 		},
+		"Resource No found error ": {
+			reason: "We should return error",
+			fields: fields{
+				kube: &test.MockClient{
+					MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+						switch o := obj.(type) {
+						case *apisv1alpha1.ProviderConfig:
+							o.Spec.Credentials.Source = credentialsSource
+							o.Spec.Credentials.SecretRef = &xpv1.SecretKeySelector{
+								Key: "creds",
+							}
+						case *corev1.Secret:
+							o.Data = map[string][]byte{
+								"creds": []byte("{\"APIKey\":\"foo\",\"Email\":\"foo@bar.com\"}"),
+							}
+						}
+						return nil
+					},
+				},
+				usage: &fake.MockTracker{
+					MockTrack: func(ctx context.Context, mg resource.Managed) error {
+						return nil
+					},
+				},
+				newServiceFn: func(creds []byte) (*rabbitmqclient.RabbitMqService, error) {
+					return &rabbitmqclient.RabbitMqService{}, nil
+				},
+				logger: &fake.MockLog{},
+			},
+			args: args{},
+			want: pkgErrors.New(errNotPermissions),
+		},
 	}
 
 	for name, tc := range cases {
@@ -481,6 +516,101 @@ func TestObserve(t *testing.T) {
 				},
 			},
 		},
+		"Resource No found error ": {
+			reason: "We should return error",
+			fields: fields{
+				service: &rabbitmqclient.RabbitMqService{
+					Rmqc: &fake.MockClient{},
+				},
+				logger: &fake.MockLog{},
+			},
+			args: args{},
+			want: want{
+				o: managed.ExternalObservation{
+					ResourceExists: false,
+				},
+				err: pkgErrors.New(errNotPermissions),
+			},
+		},
+		"Resource IsNotCrossplaneManaged error ": {
+			reason: "We should return error",
+			fields: fields{
+				service: &rabbitmqclient.RabbitMqService{Rmqc: &fake.MockClient{
+					MockGetPermissionsIn: func(vhost, username string) (rec rabbithole.PermissionInfo, err error) {
+						rec = rabbithole.PermissionInfo{
+							User:      username,
+							Vhost:     vhost,
+							Configure: ".*",
+							Write:     ".*",
+							Read:      ".*",
+						}
+						return rec, err
+					},
+				}},
+				logger: &fake.MockLog{},
+			},
+			args: args{
+				mg: &v1alpha1.Permissions{
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: map[string]string{},
+					},
+					Spec: v1alpha1.PermissionsSpec{
+						ForProvider: v1alpha1.PermissionsParameters{
+							User:  "test",
+							Vhost: "test",
+							PermissionSettings: &v1alpha1.PermissionSettings{
+								Write:     ".*",
+								Read:      ".*",
+								Configure: ".*",
+							},
+						},
+					},
+				},
+			},
+			want: want{
+				o: managed.ExternalObservation{
+					ResourceExists: false,
+				},
+				err: pkgErrors.Wrap(errors.New("external object is managed by other resource or import is required (external name: test/test)"), ""),
+			},
+		},
+		"Resource get error ": {
+			reason: "We should return error",
+			fields: fields{
+				service: &rabbitmqclient.RabbitMqService{Rmqc: &fake.MockClient{
+					MockGetPermissionsIn: func(vhost, username string) (rec rabbithole.PermissionInfo, err error) {
+						return rec, errors.New("error")
+					},
+				}},
+				logger: &fake.MockLog{},
+			},
+			args: args{
+				mg: &v1alpha1.Permissions{
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: map[string]string{
+							rabbitmqmeta.AnnotationKeyCrossplaneManaged: "true",
+						},
+					},
+					Spec: v1alpha1.PermissionsSpec{
+						ForProvider: v1alpha1.PermissionsParameters{
+							User:  "test",
+							Vhost: "test",
+							PermissionSettings: &v1alpha1.PermissionSettings{
+								Write:     ".*",
+								Read:      ".*",
+								Configure: ".*",
+							},
+						},
+					},
+				},
+			},
+			want: want{
+				o: managed.ExternalObservation{
+					ResourceExists: false,
+				},
+				err: pkgErrors.Wrap(errors.New("error"), errGetFailed),
+			},
+		},
 	}
 
 	for name, tc := range cases {
@@ -598,6 +728,58 @@ func TestCreate(t *testing.T) {
 				err: pkgErrors.Wrap(errors.New("error"), "cannot create new User Permissions"),
 			},
 		},
+		"Resource No found error ": {
+			reason: "We should return error",
+			fields: fields{
+				service: &rabbitmqclient.RabbitMqService{
+					Rmqc: &fake.MockClient{},
+				},
+				logger: &fake.MockLog{},
+			},
+			args: args{},
+			want: want{
+				o:   managed.ExternalCreation{},
+				err: pkgErrors.New(errNotPermissions),
+			},
+		},
+		"Error Close": {
+			reason: "We should not return error",
+			fields: fields{
+
+				service: &rabbitmqclient.RabbitMqService{Rmqc: &fake.MockClient{
+					MockUpdatePermissionsIn: func(vhost, username string, permissions rabbithole.Permissions) (res *http.Response, err error) {
+						res = &http.Response{StatusCode: 200,
+							Body: fake.MockReadCloser{
+								MockClose: func() (err error) {
+									return errors.New("error")
+								},
+							}}
+						return res, err
+					},
+				}},
+				logger: &fake.MockLog{},
+			},
+			args: args{
+				mg: &v1alpha1.Permissions{
+					Spec: v1alpha1.PermissionsSpec{
+						ForProvider: v1alpha1.PermissionsParameters{
+							User:  "test",
+							Vhost: "test",
+							PermissionSettings: &v1alpha1.PermissionSettings{
+								Write:     ".*",
+								Read:      ".*",
+								Configure: ".*",
+							},
+						},
+					},
+				},
+			},
+			want: want{
+				o: managed.ExternalCreation{
+					ConnectionDetails: managed.ConnectionDetails{},
+				},
+			},
+		},
 	}
 
 	for name, tc := range cases {
@@ -713,6 +895,58 @@ func TestUpdate(t *testing.T) {
 				err: pkgErrors.Wrap(errors.New("error"), "cannot update User Permissions"),
 			},
 		},
+		"Resource No found error ": {
+			reason: "We should return error",
+			fields: fields{
+				service: &rabbitmqclient.RabbitMqService{
+					Rmqc: &fake.MockClient{},
+				},
+				logger: &fake.MockLog{},
+			},
+			args: args{},
+			want: want{
+				o:   managed.ExternalUpdate{},
+				err: pkgErrors.New(errNotPermissions),
+			},
+		},
+		"Error close": {
+			reason: "We should not return error",
+			fields: fields{
+
+				service: &rabbitmqclient.RabbitMqService{Rmqc: &fake.MockClient{
+					MockUpdatePermissionsIn: func(vhost, username string, permissions rabbithole.Permissions) (res *http.Response, err error) {
+						res = &http.Response{StatusCode: 200,
+							Body: fake.MockReadCloser{
+								MockClose: func() (err error) {
+									return errors.New("error")
+								},
+							}}
+						return res, err
+					},
+				}},
+				logger: &fake.MockLog{},
+			},
+			args: args{
+				mg: &v1alpha1.Permissions{
+					Spec: v1alpha1.PermissionsSpec{
+						ForProvider: v1alpha1.PermissionsParameters{
+							User:  "test",
+							Vhost: "test",
+							PermissionSettings: &v1alpha1.PermissionSettings{
+								Write:     ".*",
+								Read:      ".*",
+								Configure: ".*",
+							},
+						},
+					},
+				},
+			},
+			want: want{
+				o: managed.ExternalUpdate{
+					ConnectionDetails: managed.ConnectionDetails{},
+				},
+			},
+		},
 	}
 
 	for name, tc := range cases {
@@ -824,6 +1058,56 @@ func TestDelete(t *testing.T) {
 			want: want{
 				o:   managed.ExternalDelete{},
 				err: pkgErrors.Wrap(errors.New("error"), "cannot delete User Permissions"),
+			},
+		},
+		"Resource No found error": {
+			reason: "We should return error",
+			fields: fields{
+				service: &rabbitmqclient.RabbitMqService{
+					Rmqc: &fake.MockClient{},
+				},
+				logger: &fake.MockLog{},
+			},
+			args: args{},
+			want: want{
+				o:   managed.ExternalDelete{},
+				err: pkgErrors.New(errNotPermissions),
+			},
+		},
+		"Error Close": {
+			reason: "We should not return error",
+			fields: fields{
+
+				service: &rabbitmqclient.RabbitMqService{Rmqc: &fake.MockClient{
+					MockClearPermissionsIn: func(vhost, username string) (res *http.Response, err error) {
+						res = &http.Response{StatusCode: 200,
+							Body: fake.MockReadCloser{
+								MockClose: func() (err error) {
+									return errors.New("error")
+								},
+							}}
+						return res, err
+					},
+				}},
+				logger: &fake.MockLog{},
+			},
+			args: args{
+				mg: &v1alpha1.Permissions{
+					Spec: v1alpha1.PermissionsSpec{
+						ForProvider: v1alpha1.PermissionsParameters{
+							User:  "test",
+							Vhost: "test",
+							PermissionSettings: &v1alpha1.PermissionSettings{
+								Write:     ".*",
+								Read:      ".*",
+								Configure: ".*",
+							},
+						},
+					},
+				},
+			},
+			want: want{
+				o: managed.ExternalDelete{},
 			},
 		},
 	}

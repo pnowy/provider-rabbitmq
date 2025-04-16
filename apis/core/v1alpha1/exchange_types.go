@@ -29,13 +29,13 @@ import (
 type ExchangeParameters struct {
 	Name             *string           `json:"name,omitempty"`
 	Vhost            string            `json:"vhost"`
-	ExchangeSettings *ExchangeSettings `json:"exchange_settings,omitempty"`
+	ExchangeSettings *ExchangeSettings `json:"exchangeSettings,omitempty"`
 }
 
 type ExchangeSettings struct {
 	Type       *string `json:"type,omitempty"`
 	Durable    *bool   `json:"durable,omitempty"`
-	AutoDelete *bool   `json:"auto_delete,omitempty"`
+	AutoDelete *bool   `json:"autoDelete,omitempty"`
 }
 
 // ExchangeObservation are the observable fields of a Exchange.
@@ -44,7 +44,7 @@ type ExchangeObservation struct {
 	Vhost      string `json:"vhost,omitempty"`
 	Type       string `json:"type,omitempty"`
 	Durable    bool   `json:"durable,omitempty"`
-	AutoDelete bool   `json:"auto_delete,omitempty"`
+	AutoDelete bool   `json:"autoDelete,omitempty"`
 }
 
 // A ExchangeSpec defines the desired state of a Exchange.
