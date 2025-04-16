@@ -278,3 +278,154 @@ func TestObserve(t *testing.T) {
 		})
 	}
 }
+
+func TestCreate(t *testing.T) {
+	vHostTestName := "example-vhost"
+	defaultQueueType := "classic"
+	defaultTracing := false
+	defaultDescription := "example-description"
+
+	type fields struct {
+		service *rabbitmqclient.RabbitMqService
+		logger  logging.Logger
+	}
+
+	type args struct {
+		ctx context.Context
+		mg  resource.Managed
+	}
+
+	type want struct {
+		o   managed.ExternalCreation
+		err error
+	}
+
+	cases := map[string]struct {
+		reason string
+		fields fields
+		args   args
+		want   want
+	}{
+		"Create succeeds": {
+			reason: "Should return managed.ExternalCreation{} on success",
+			fields: fields{
+				service: &rabbitmqclient.RabbitMqService{
+					Rmqc: &fake.MockClient{
+						MockPutVhost: func(name string, settings rabbithole.VhostSettings) (res *http.Response, err error) {
+							res = &http.Response{StatusCode: 201, Body: fake.MockReadCloser{MockClose: func() error { return nil }}}
+							return res, nil
+						},
+					},
+				},
+				logger: &fake.MockLog{},
+			},
+			args: args{
+				mg: &v1alpha1.Vhost{
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: map[string]string{
+							rabbitmqmeta.AnnotationKeyCrossplaneManaged: "true",
+						},
+					},
+					Spec: v1alpha1.VhostSpec{
+						ForProvider: v1alpha1.VhostParameters{
+							HostName: &vHostTestName,
+							VhostSettings: &v1alpha1.VhostSettings{
+								DefaultQueueType: &defaultQueueType,
+								Tracing:          &defaultTracing,
+								Description:      &defaultDescription,
+							},
+						},
+					},
+				},
+			},
+			want: want{
+				o: managed.ExternalCreation{},
+			},
+		},
+		"Create with provided vhost settings": {
+			reason: "Should pass DefaultQueueType and Description to the client",
+			fields: fields{
+				service: &rabbitmqclient.RabbitMqService{
+					Rmqc: &fake.MockClient{
+						MockPutVhost: func(name string, settings rabbithole.VhostSettings) (res *http.Response, err error) {
+							res = &http.Response{StatusCode: 200,
+								Body: fake.MockReadCloser{
+									MockClose: func() (err error) {
+										return nil
+									},
+								}}
+							return res, err
+						},
+					},
+				},
+				logger: &fake.MockLog{},
+			},
+			args: args{
+				mg: &v1alpha1.Vhost{
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: map[string]string{
+							rabbitmqmeta.AnnotationKeyCrossplaneManaged: "true",
+						},
+					},
+					Spec: v1alpha1.VhostSpec{
+						ForProvider: v1alpha1.VhostParameters{
+							HostName: &vHostTestName,
+							VhostSettings: &v1alpha1.VhostSettings{
+								DefaultQueueType: &defaultQueueType,
+								Tracing:          &defaultTracing,
+								Description:      &defaultDescription,
+							},
+						},
+					},
+				},
+			},
+			want: want{
+				o: managed.ExternalCreation{},
+			},
+		},
+		"Create fails": {
+			reason: "Should return error if client returns error",
+			fields: fields{
+				service: &rabbitmqclient.RabbitMqService{
+					Rmqc: &fake.MockClient{
+						MockPutVhost: func(name string, settings rabbithole.VhostSettings) (res *http.Response, err error) {
+							res = &http.Response{StatusCode: 500}
+							return res, errors.New("create error")
+						},
+					},
+				},
+				logger: &fake.MockLog{},
+			},
+			args: args{
+				mg: &v1alpha1.Vhost{
+					Spec: v1alpha1.VhostSpec{
+						ForProvider: v1alpha1.VhostParameters{
+							HostName: &vHostTestName,
+							VhostSettings: &v1alpha1.VhostSettings{
+								DefaultQueueType: &defaultQueueType,
+								Tracing:          &defaultTracing,
+								Description:      &defaultDescription,
+							},
+						},
+					},
+				},
+			},
+			want: want{
+				err: errors.Wrap(errors.New("create error"), errCreateFailed),
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			e := external{service: tc.fields.service, log: tc.fields.logger}
+			got, err := e.Create(tc.args.ctx, tc.args.mg)
+			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
+				t.Errorf("\n%s\ne.Create(...): -want error, +got error:\n%s\n", tc.reason, diff)
+			}
+			if diff := cmp.Diff(tc.want.o, got); diff != "" {
+				t.Errorf("\n%s\ne.Create(...): -want, +got:\n%s\n", tc.reason, diff)
+			}
+		})
+	}
+}
