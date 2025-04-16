@@ -218,7 +218,7 @@ func TestConnect(t *testing.T) {
 					},
 				},
 				newServiceFn: func(creds []byte) (*rabbitmqclient.RabbitMqService, error) {
-					return &rabbitmqclient.RabbitMqService{}, errors.New("Error in RabbitmqService NewClient")
+					return &rabbitmqclient.RabbitMqService{}, errors.New("error in RabbitmqService NewClient")
 				},
 			},
 			args: args{
@@ -232,7 +232,7 @@ func TestConnect(t *testing.T) {
 					},
 				},
 			},
-			want: pkgErrors.Wrap(errors.New("Error in RabbitmqService NewClient"), "cannot create new Service"),
+			want: pkgErrors.Wrap(errors.New("error in RabbitmqService NewClient"), "cannot create new Service"),
 		},
 		"Error in Track": {
 			reason: "Error should be returned.",
@@ -255,11 +255,11 @@ func TestConnect(t *testing.T) {
 				},
 				usage: &fake.MockTracker{
 					MockTrack: func(ctx context.Context, mg resource.Managed) error {
-						return errors.New("Error in Track")
+						return errors.New("error in Track")
 					},
 				},
 				newServiceFn: func(creds []byte) (*rabbitmqclient.RabbitMqService, error) {
-					return &rabbitmqclient.RabbitMqService{}, errors.New("Error in RabbitmqService NewClient")
+					return &rabbitmqclient.RabbitMqService{}, errors.New("error in RabbitmqService NewClient")
 				},
 			},
 			args: args{
@@ -273,7 +273,7 @@ func TestConnect(t *testing.T) {
 					},
 				},
 			},
-			want: pkgErrors.Wrap(errors.New("Error in Track"), "cannot track ProviderConfig usage"),
+			want: pkgErrors.Wrap(errors.New("error in Track"), "cannot track ProviderConfig usage"),
 		},
 		"Resource No found error ": {
 			reason: "We should return error",
