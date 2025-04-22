@@ -7,9 +7,9 @@ spec:
     vhost: demo
     source: myexchange
     destinationType: queue
-    destination: test
+    destination: myqueue
     routingKey: "my-custom-key"
     arguments:
-      test: test3
+      region: europe
   providerConfigRef:
     name: provider-rabbitmq

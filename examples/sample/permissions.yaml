@@ -1,11 +1,11 @@
 apiVersion: core.rabbitmq.crossplane.io/v1alpha1
 kind: Permissions
 metadata:
-  name: my-permissions
+  name: demo-user-permissions
 spec:
   forProvider:
     vhost: demo
-    user: test-user
+    user: demo
     permissions:
       configure: .*
       write: .*

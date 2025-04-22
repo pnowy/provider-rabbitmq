@@ -137,6 +137,10 @@ The method is a `Makefile` target that sets up a complete development environmen
 This method provides developers with a one-command solution to set up a complete development environment with all necessary components for working with the
 Crossplane RabbitMQ provider.
 
+As a next step you can apply some examples from the [examples/sample](examples/sample) directory (e.g. `vhost.yaml`). To log in into RabbitMQ admin
+console from localhost execute the command: `k port-forward svc/rabbitmq 15672:15672 -n rabbitmq` and then open http://localhost:15672 in your browser. Login
+with username `guest` and password `guest`.
+
 ## Development
 
 For information on how to contribute to this provider, please see the [Development Guide](DEVELOPMENT.md).

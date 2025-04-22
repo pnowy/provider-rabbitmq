@@ -7,6 +7,7 @@ spec:
     username: demo
     userSettings:
       password: demo2
-      tags: ["administrator"]
+      tags:
+        - "administrator"
   providerConfigRef:
     name: provider-rabbitmq
