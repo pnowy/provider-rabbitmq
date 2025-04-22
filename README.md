@@ -129,7 +129,7 @@ The method is a `Makefile` target that sets up a complete development environmen
 1. **Creates a local Kubernetes cluster** using Kind (Kubernetes in Docker) named "crossplane-rabbitmq-quickstart"
 2. **Sets up the Kubernetes context** to point to the newly created cluster
 3. **Installs Crossplane using Helm in a dedicated "crossplane-system" namespace** (a Kubernetes add-on for managing infrastructure resources)
-4. **Installs RabbitMQ using Helm in a dedicated "rabbitmq" namespace**:
+4. **Installs RabbitMQ using Helm in a dedicated "rabbitmq" namespace**
 5. **Installs Provider RabbitMQ**:
     - Applies the provider specification from `examples/provider/provider.yaml`
     - Applies configuration from `examples/provider/config.yaml`
