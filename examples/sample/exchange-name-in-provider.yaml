@@ -1,7 +1,7 @@
 apiVersion: core.rabbitmq.crossplane.io/v1alpha1
 kind: Exchange
 metadata:
-  name: myexchange-2
+  name: myexchange-name-in-provider
 spec:
   forProvider:
     name: crossplane-exchange

@@ -34,7 +34,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: A Exchange is an example API type.
+        description: Exchange - manage exchanges
         properties:
           apiVersion:
             description: |-

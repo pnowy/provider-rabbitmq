@@ -34,7 +34,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: A Queue is an example API type.
+        description: Queue - manage queues
         properties:
           apiVersion:
             description: |-

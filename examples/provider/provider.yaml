@@ -4,4 +4,4 @@ metadata:
   name: provider-rabbitmq
   namespace: crossplane-system
 spec:
-  package: ghcr.io/pnowy/provider-rabbitmq:v0.0.0-36.gb57720d
+  package: ghcr.io/pnowy/provider-rabbitmq:v0.0.0-30.g4b69022

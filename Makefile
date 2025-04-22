@@ -112,6 +112,21 @@ dev-init: $(KIND) $(KUBECTL)
 	@$(INFO) Installing Provider RabbitMq CRDs
 	@$(KUBECTL) apply -R -f package/crds
 
+quickstart: $(KIND) $(KUBECTL)
+	@$(INFO) Creating kind cluster
+	@$(KIND) create cluster --name=crossplane-rabbitmq-quickstart
+	@$(KUBECTL) cluster-info --context kind-crossplane-rabbitmq-quickstart
+	@$(INFO) Installing Crossplane
+	@helm dep update helm/crossplane
+	@helm upgrade crossplane helm/crossplane --install --namespace crossplane-system --create-namespace
+	@$(INFO) Installing RabbitMq
+	@helm dep update helm/rabbitmq
+	@helm upgrade rabbitmq helm/rabbitmq --install --namespace rabbitmq --create-namespace
+	@$(INFO) Installing RabbitMq provider
+	@$(KUBECTL) apply -f examples/provider/provider.yaml
+	sleep 5
+	@$(KUBECTL) apply -f examples/provider/config.yaml
+
 dev-clean: $(KIND) $(KUBECTL)
 	@$(INFO) Deleting kind cluster
 	@$(KIND) delete cluster --name=$(PROJECT_NAME)-dev
