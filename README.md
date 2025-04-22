@@ -114,7 +114,7 @@ You can explore the available custom resources:
 
 - `kubectl get crd | grep rabbitmq.crossplane.io` to list all the CRDs provided by the provider
 - `kubectl explain <CRD_NAME>` for docs on the CLI
-You can also see the CRDs in the package/crds directory
+- You can also see the CRDs in the `package/crds` directory
 
 ## Usage Examples
 
