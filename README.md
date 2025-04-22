@@ -120,6 +120,23 @@ You can explore the available custom resources:
 
 You will find usage examples in the [examples](examples) directory.
 
+## Quickstart
+
+If you would like to quickstart with the provider you can use `make quickstart` command.
+
+The method is a `Makefile` target that sets up a complete development environment for testing and using a RabbitMQ provider for Crossplane.
+
+1. **Creates a local Kubernetes cluster** using Kind (Kubernetes in Docker) named "crossplane-rabbitmq-quickstart"
+2. **Sets up the Kubernetes context** to point to the newly created cluster
+3. **Installs Crossplane using Helm in a dedicated "crossplane-system" namespace** (a Kubernetes add-on for managing infrastructure resources)
+4. **Installs RabbitMQ using Helm in a dedicated "rabbitmq" namespace**:
+5. **Installs Provider RabbitMQ**:
+    - Applies the provider specification from `examples/provider/provider.yaml`
+    - Applies configuration from `examples/provider/config.yaml`
+
+This method provides developers with a one-command solution to set up a complete development environment with all necessary components for working with the
+Crossplane RabbitMQ provider.
+
 ## Development
 
 For information on how to contribute to this provider, please see the [Development Guide](DEVELOPMENT.md).

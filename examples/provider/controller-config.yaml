@@ -1,9 +1,0 @@
-apiVersion: pkg.crossplane.io/v1alpha1
-kind: ControllerConfig
-metadata:
-  name: provider-rabbitmq
-spec:
-  tolerations:
-    - effect: NoSchedule
-      key: crossplane
-      operator: Exists
