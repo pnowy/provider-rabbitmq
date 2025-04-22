@@ -1,45 +1,125 @@
-# provider-rabbitmq
+# Crossplane Provider for RabbitMQ
 
-`provider-rabbitmq` is a minimal [Crossplane](https://crossplane.io/) Provider
-that is meant to be used as a rabbitmq for implementing new Providers. It comes
-with the following features that are meant to be refactored:
+`provider-rabbitmq` is a [Crossplane](https://crossplane.io/) provider that enables management of RabbitMQ resources through Kubernetes custom resources. This
+provider allows you to manage RabbitMQ resources using Kubernetes-style declarative configurations.
 
-- A `ProviderConfig` type that only points to a credentials `Secret`.
-- A `MyType` resource type that serves as an example managed resource.
-- A managed resource controller that reconciles `MyType` objects and simply
-  prints their configuration in its `Observe` method.
+## Overview
 
-## Developing
+The RabbitMQ provider offers the following features:
 
-1. Use this repository as a rabbitmq to create a new one.
-1. Run `make submodules` to initialize the "build" Make submodule we use for CI/CD.
-1. Rename the provider by running the following command:
-```shell
-  export provider_name=MyProvider # Camel case, e.g. GitHub
-  make provider.prepare provider=${provider_name}
+- **Virtual Hosts**: Manage virtual hosts
+- **Users**: Manage users
+- **Exchanges**: Manage exchanges
+- **Queues**: Manage queues
+- **Bindings**: Configure bindings between exchanges and queues
+- **Permissions**: Manage user permissions within virtual hosts
+
+Planned features:
+
+- **Policies**: Manage RabbitMQ policies for queues and exchanges
+- **Operator policies**: Manage operator policies for queues
+- **Topic permissions**: Manage a user's set of topic permissions
+- **Federation upstream**: Manage federation upstream
+- **Shovel**: Manage dynamic shovel
+
+## Getting Started
+
+### Installation
+
+To install the provider, use the following resource definition (replace `PROVIDER_VERSION` with the desired version):
+
+```yaml
+apiVersion: pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  name: provider-rabbitmq
+  namespace: crossplane-system
+spec:
+  package: ghcr.io/pnowy/provider-rabbitmq:PROVIDER_VERSION
 ```
-4. Add your new type by running the following command:
-```shell
-  export group=sample # lower case e.g. core, cache, database, storage, etc.
-  export type=MyType # Camel casee.g. Bucket, Database, CacheCluster, etc.
-  make provider.addtype provider=${provider_name} group=${group} kind=${type}
+
+This will install the provider in the `crossplane-system` namespace and install CRDs and controllers for the provider.
+
+### Controller config (optional)
+
+In order to configure the provider controller, create a `ControllerConfig` resource:
+
+```yaml
+apiVersion: pkg.crossplane.io/v1alpha1
+kind: ControllerConfig
+metadata:
+  name: provider-rabbitmq
+spec:
+  tolerations:
+    - effect: NoSchedule
+      key: crossplane
+      operator: Exists
 ```
-5. Replace the *sample* group with your new group in apis/{provider}.go
-5. Replace the *mytype* type with your new type in internal/controller/{provider}.go
-5. Replace the default controller and ProviderConfig implementations with your own
-5. Run `make reviewable` to run code generation, linters, and tests.
-5. Run `make build` to build the provider.
 
-Refer to Crossplane's [CONTRIBUTING.md] file for more information on how the
-Crossplane community prefers to work. The [Provider Development][provider-dev]
-guide may also be of use.
+which can be referenced in the provider definition:
 
-[CONTRIBUTING.md]: https://github.com/crossplane/crossplane/blob/master/CONTRIBUTING.md
-[provider-dev]: https://github.com/crossplane/crossplane/blob/master/contributing/guide-provider-development.md
-
-
+```yaml
+apiVersion: pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  name: provider-rabbitmq
+  namespace: crossplane-system
+spec:
+  package: ghcr.io/pnowy/provider-rabbitmq:PROVIDER_VERSION
+  controllerConfigRef:
+    name: provider-rabbitmq
 ```
-make provider.prepare provider=RabbitMq
-make provider.addtype provider=RabbitMq group=core kind=Vhost
-make generate
+
+### Setup
+
+The provider requires credentials to connect to your RabbitMQ server. Create a Kubernetes secret with your RabbitMQ credentials:
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: rabbitmq-credentials
+  namespace: crossplane-system
+stringData:
+  credentials: |
+    {
+      "username": "guest",
+      "password": "guest",
+      "endpoint": "http://rabbitmq.rabbitmq.svc.cluster.local:15672"
+    }
 ```
+
+Then create a `ProviderConfig` to use these credentials:
+
+```yaml
+apiVersion: rabbitmq.crossplane.io/v1alpha1
+kind: ProviderConfig
+metadata:
+  name: provider-rabbitmq
+spec:
+  credentials:
+    source: Secret
+    secretRef:
+      name: rabbitmq-credentials
+      namespace: crossplane-system
+      key: credentials
+```
+
+- For each RabbitMQ instance you need one or more `ProviderConfig` resources
+- The `ProviderConfig` resource is used to store the RabbitMQ endpoint, username and password details that are required to connect to the RabbitMQ API server
+
+## Custom Resource Definitions
+
+You can explore the available custom resources:
+
+- `kubectl get crd | grep rabbitmq.crossplane.io` to list all the CRDs provided by the provider
+- `kubectl explain <CRD_NAME>` for docs on the CLI
+You can also see the CRDs in the package/crds directory
+
+## Usage Examples
+
+You will find usage examples in the [examples](examples) directory.
+
+## Development
+
+For information on how to contribute to this provider, please see the [Development Guide](DEVELOPMENT.md).

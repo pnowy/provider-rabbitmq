@@ -34,7 +34,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: A Vhost is an example API type.
+        description: Vhost - manage vhosts
         properties:
           apiVersion:
             description: |-
