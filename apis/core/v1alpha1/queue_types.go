@@ -41,18 +41,20 @@ type QueueParameters struct {
 // +kubebuilder:validation:XValidation:rule="!has(oldSelf.durable) || self.durable == oldSelf.durable",message="Durable is immutable once set"
 // +kubebuilder:validation:XValidation:rule="!has(oldSelf.autoDelete) || self.autoDelete == oldSelf.autoDelete",message="AutoDelete is immutable once set"
 type QueueSettings struct {
-	Type       *string `json:"type,omitempty"`
-	Durable    *bool   `json:"durable,omitempty"`
-	AutoDelete *bool   `json:"autoDelete,omitempty"`
+	Type       *string           `json:"type,omitempty"`
+	Durable    *bool             `json:"durable,omitempty"`
+	AutoDelete *bool             `json:"autoDelete,omitempty"`
+	Arguments  map[string]string `json:"arguments,omitempty"`
 }
 
 // QueueObservation are the observable fields of a Queue.
 type QueueObservation struct {
-	Name       string `json:"name,omitempty"`
-	Vhost      string `json:"vhost"`
-	Type       string `json:"type,omitempty"`
-	Durable    bool   `json:"durable,omitempty"`
-	AutoDelete bool   `json:"autoDelete,omitempty"`
+	Name       string            `json:"name,omitempty"`
+	Vhost      string            `json:"vhost"`
+	Type       string            `json:"type,omitempty"`
+	Durable    bool              `json:"durable,omitempty"`
+	AutoDelete bool              `json:"autoDelete,omitempty"`
+	Arguments  map[string]string `json:"arguments,omitempty"`
 }
 
 // A QueueSpec defines the desired state of a Queue.
