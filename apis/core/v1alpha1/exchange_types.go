@@ -26,6 +26,9 @@ import (
 )
 
 // ExchangeParameters are the configurable fields of a Exchange.
+// +kubebuilder:validation:Required
+// +kubebuilder:validation:XValidation:rule="!has(oldSelf.name) || self.name == oldSelf.name",message="Name is immutable once set"
+// +kubebuilder:validation:XValidation:rule="!has(oldSelf.vhost) || self.vhost == oldSelf.vhost",message="Vhost is immutable once"
 type ExchangeParameters struct {
 	Name             *string           `json:"name,omitempty"`
 	Vhost            string            `json:"vhost"`

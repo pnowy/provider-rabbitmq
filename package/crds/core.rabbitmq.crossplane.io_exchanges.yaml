@@ -103,6 +103,11 @@ spec:
                 required:
                 - vhost
                 type: object
+                x-kubernetes-validations:
+                - message: Name is immutable once set
+                  rule: '!has(oldSelf.name) || self.name == oldSelf.name'
+                - message: Vhost is immutable once
+                  rule: '!has(oldSelf.vhost) || self.vhost == oldSelf.vhost'
               managementPolicies:
                 default:
                 - '*'
