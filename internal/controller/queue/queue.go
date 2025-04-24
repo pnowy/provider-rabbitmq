@@ -260,6 +260,9 @@ func generateQueueSettings(spec *v1alpha1.QueueSettings) rabbithole.QueueSetting
 	if spec.Durable != nil {
 		settings.Durable = *spec.Durable
 	}
+	if spec.Arguments != nil {
+		settings.Arguments = rabbitmqclient.ConvertStringMapToInterfaceMap(spec.Arguments)
+	}
 	return settings
 }
 
@@ -280,6 +283,9 @@ func lateInitialize(spec *v1alpha1.QueueParameters, api *rabbithole.DetailedQueu
 	if spec.QueueSettings.Durable == nil {
 		spec.QueueSettings.Durable = &api.Durable
 	}
+	if spec.QueueSettings.Arguments == nil {
+		spec.QueueSettings.Arguments = rabbitmqclient.ConvertInterfaceMapToStringMap(api.Arguments)
+	}
 }
 
 func generateQueueObservation(api *rabbithole.DetailedQueueInfo) v1alpha1.QueueObservation {
@@ -292,6 +298,7 @@ func generateQueueObservation(api *rabbithole.DetailedQueueInfo) v1alpha1.QueueO
 		Type:       api.Type,
 		Durable:    api.Durable,
 		AutoDelete: bool(api.AutoDelete),
+		Arguments:  rabbitmqclient.ConvertInterfaceMapToStringMap(api.Arguments),
 	}
 
 	return observation
@@ -308,6 +315,8 @@ func isUpToDate(spec *v1alpha1.QueueParameters, api *rabbithole.DetailedQueueInf
 		if !rabbitmqclient.IsBoolPtrEqualToBool(spec.QueueSettings.AutoDelete, bool(api.AutoDelete)) {
 			return false
 		}
+		argumentsUpToDate, _ := rabbitmqclient.MapsEqualJSON(spec.QueueSettings.Arguments, rabbitmqclient.ConvertInterfaceMapToStringMap(api.Arguments))
+		return argumentsUpToDate
 	}
 	return true
 }

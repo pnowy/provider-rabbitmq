@@ -28,7 +28,7 @@ import (
 // QueueParameters are the configurable fields of a Queue.
 // +kubebuilder:validation:Required
 // +kubebuilder:validation:XValidation:rule="!has(oldSelf.name) || self.name == oldSelf.name",message="Name is immutable once set"
-// +kubebuilder:validation:XValidation:rule="!has(oldSelf.vhost) || self.vhost == oldSelf.vhost",message="Vhost is immutable once"
+// +kubebuilder:validation:XValidation:rule="!has(oldSelf.vhost) || self.vhost == oldSelf.vhost",message="Vhost is immutable once set"
 type QueueParameters struct {
 	Name          *string        `json:"name,omitempty"`
 	Vhost         string         `json:"vhost"`
@@ -40,19 +40,22 @@ type QueueParameters struct {
 // +kubebuilder:validation:XValidation:rule="!has(oldSelf.type) || self.type == oldSelf.type",message="Type is immutable once set"
 // +kubebuilder:validation:XValidation:rule="!has(oldSelf.durable) || self.durable == oldSelf.durable",message="Durable is immutable once set"
 // +kubebuilder:validation:XValidation:rule="!has(oldSelf.autoDelete) || self.autoDelete == oldSelf.autoDelete",message="AutoDelete is immutable once set"
+// +kubebuilder:validation:XValidation:rule="!has(oldSelf.arguments) || self.arguments == oldSelf.arguments",message="Arguments are immutable once set"
 type QueueSettings struct {
-	Type       *string `json:"type,omitempty"`
-	Durable    *bool   `json:"durable,omitempty"`
-	AutoDelete *bool   `json:"autoDelete,omitempty"`
+	Type       *string           `json:"type,omitempty"`
+	Durable    *bool             `json:"durable,omitempty"`
+	AutoDelete *bool             `json:"autoDelete,omitempty"`
+	Arguments  map[string]string `json:"arguments,omitempty"`
 }
 
 // QueueObservation are the observable fields of a Queue.
 type QueueObservation struct {
-	Name       string `json:"name,omitempty"`
-	Vhost      string `json:"vhost"`
-	Type       string `json:"type,omitempty"`
-	Durable    bool   `json:"durable,omitempty"`
-	AutoDelete bool   `json:"autoDelete,omitempty"`
+	Name       string            `json:"name,omitempty"`
+	Vhost      string            `json:"vhost"`
+	Type       string            `json:"type,omitempty"`
+	Durable    bool              `json:"durable,omitempty"`
+	AutoDelete bool              `json:"autoDelete,omitempty"`
+	Arguments  map[string]string `json:"arguments,omitempty"`
 }
 
 // A QueueSpec defines the desired state of a Queue.

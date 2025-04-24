@@ -169,7 +169,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		bindingFound = true
 		current := cr.Spec.ForProvider.DeepCopy()
 		isResourceLateInitialized = !cmp.Equal(current, &cr.Spec.ForProvider)
-		cr.Status.AtProvider = GenerateBindingObservation(binding)
+		cr.Status.AtProvider = generateBindingObservation(binding)
 		cr.Status.SetConditions(xpv1.Available())
 		isBindingUptoDate = isUpToDate(&cr.Spec.ForProvider, binding)
 	}
@@ -197,7 +197,7 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	}
 
 	c.log.Info("Creating binding", "binding", cr.Name)
-	bindingInfo := GenerateBindingInfo(&cr.Spec.ForProvider)
+	bindingInfo := generateBindingInfo(&cr.Spec.ForProvider)
 	resp, err := c.service.Rmqc.DeclareBinding(cr.Spec.ForProvider.Vhost, bindingInfo)
 
 	if err != nil {
@@ -233,7 +233,7 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 	}
 	c.log.Info("Deleting binding", "binding", cr.Name)
 
-	bindingInfo := GenerateBindingInfo(&cr.Spec.ForProvider)
+	bindingInfo := generateBindingInfo(&cr.Spec.ForProvider)
 	// Getting Properties Keys from Status
 	bindingInfo.PropertiesKey = cr.Status.AtProvider.PropertiesKey
 	resp, err := c.service.Rmqc.DeleteBinding(cr.Spec.ForProvider.Vhost, bindingInfo)
@@ -251,7 +251,7 @@ func (c *external) Disconnect(ctx context.Context) error {
 	return nil
 }
 
-func GenerateBindingInfo(binding *v1alpha1.BindingParameters) rabbithole.BindingInfo {
+func generateBindingInfo(binding *v1alpha1.BindingParameters) rabbithole.BindingInfo {
 	arguments := rabbitmqclient.ConvertStringMapToInterfaceMap(binding.Arguments)
 	bidingInfo := rabbithole.BindingInfo{
 		Source:          binding.Source,
@@ -263,7 +263,7 @@ func GenerateBindingInfo(binding *v1alpha1.BindingParameters) rabbithole.Binding
 	return bidingInfo
 }
 
-func GenerateBindingObservation(api *rabbithole.BindingInfo) v1alpha1.BindingObservation {
+func generateBindingObservation(api *rabbithole.BindingInfo) v1alpha1.BindingObservation {
 	if api == nil {
 		return v1alpha1.BindingObservation{}
 	}

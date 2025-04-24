@@ -54,6 +54,10 @@ func TestObserve(t *testing.T) {
 	queueType := "classic"
 	queueDurable := true
 	queueAutoDelete := false
+	queueArguments := map[string]interface{}{
+		"x-queue-type":  "classic",
+		"x-message-ttl": 30000,
+	}
 	defaultClientError := rabbithole.ErrorResponse{StatusCode: http.StatusBadGateway, Message: "error"}
 
 	type fields struct {
@@ -101,6 +105,7 @@ func TestObserve(t *testing.T) {
 								Type:       queueType,
 								Durable:    queueDurable,
 								AutoDelete: rabbithole.AutoDelete(queueAutoDelete),
+								Arguments:  queueArguments,
 							}
 							return rec, nil
 						},
@@ -123,6 +128,7 @@ func TestObserve(t *testing.T) {
 								Type:       &queueType,
 								Durable:    &queueDurable,
 								AutoDelete: &queueAutoDelete,
+								Arguments:  rabbitmqclient.ConvertInterfaceMapToStringMap(queueArguments),
 							},
 						},
 					},
@@ -232,6 +238,7 @@ func TestObserve(t *testing.T) {
 								Type:       &queueType,
 								Durable:    &queueDurable,
 								AutoDelete: &queueAutoDelete,
+								Arguments:  map[string]string{},
 							},
 						},
 					},

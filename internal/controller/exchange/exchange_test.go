@@ -329,6 +329,10 @@ func TestObserve(t *testing.T) {
 	exchangeType := "fanout"
 	exchangeDurable := true
 	exchangeAutoDelete := true
+	exchangeArguments := map[string]interface{}{
+		"x-queue-type":  "classic",
+		"x-message-ttl": 30000,
+	}
 
 	type fields struct {
 		service *rabbitmqclient.RabbitMqService
@@ -363,6 +367,7 @@ func TestObserve(t *testing.T) {
 								Type:       exchangeType,
 								Durable:    exchangeDurable,
 								AutoDelete: exchangeAutoDelete,
+								Arguments:  exchangeArguments,
 							}
 							return rec, err
 						},
@@ -385,6 +390,7 @@ func TestObserve(t *testing.T) {
 								Type:       &exchangeType,
 								Durable:    &exchangeDurable,
 								AutoDelete: &exchangeAutoDelete,
+								Arguments:  rabbitmqclient.ConvertInterfaceMapToStringMap(exchangeArguments),
 							},
 						},
 					},

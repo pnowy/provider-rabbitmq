@@ -22,6 +22,12 @@ Run against a Kubernetes cluster:
 make run
 ```
 
+Run `make dev-init` to initialize the development environment with Kind and Helm Crossplane:
+
+```shell
+make dev-init
+```
+
 Run `make reviewable` to run code generation, linters, and tests:
 
 ```shell
