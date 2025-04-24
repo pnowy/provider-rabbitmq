@@ -183,7 +183,7 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	name := getExternalName(cr)
 	c.log.Info("Creating exchange", "exchange", name)
 
-	resp, err := c.service.Rmqc.DeclareExchange(cr.Spec.ForProvider.Vhost, name, generateExchangeOptions(cr.Spec.ForProvider.ExchangeSettings))
+	resp, err := c.service.Rmqc.DeclareExchange(cr.Spec.ForProvider.Vhost, name, generateExchangeSettings(cr.Spec.ForProvider.ExchangeSettings))
 
 	if err != nil {
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateFailed)
@@ -207,7 +207,7 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 	name := getExternalName(cr)
 	c.log.Info("Updating exchange", "exchange", name)
 
-	resp, err := c.service.Rmqc.DeclareExchange(cr.Spec.ForProvider.Vhost, name, generateExchangeOptions(cr.Spec.ForProvider.ExchangeSettings))
+	resp, err := c.service.Rmqc.DeclareExchange(cr.Spec.ForProvider.Vhost, name, generateExchangeSettings(cr.Spec.ForProvider.ExchangeSettings))
 
 	if err != nil {
 		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdateFailed)
@@ -246,6 +246,14 @@ func (c *external) Disconnect(ctx context.Context) error {
 	return nil
 }
 
+func getExternalName(spec *v1alpha1.Exchange) string {
+	forProviderName := spec.Spec.ForProvider.Name
+	if forProviderName != nil {
+		return *forProviderName
+	}
+	return spec.Name
+}
+
 func lateInitialize(spec *v1alpha1.ExchangeParameters, api *rabbithole.DetailedExchangeInfo) {
 	if api == nil {
 		return
@@ -255,22 +263,7 @@ func lateInitialize(spec *v1alpha1.ExchangeParameters, api *rabbithole.DetailedE
 	}
 }
 
-func generateExchangeObservation(api *rabbithole.DetailedExchangeInfo) v1alpha1.ExchangeObservation {
-	if api == nil {
-		return v1alpha1.ExchangeObservation{}
-	}
-	exchange := v1alpha1.ExchangeObservation{
-		Name:       api.Name,
-		Vhost:      api.Vhost,
-		Type:       api.Type,
-		Durable:    api.Durable,
-		AutoDelete: api.AutoDelete,
-	}
-
-	return exchange
-}
-
-func generateExchangeOptions(spec *v1alpha1.ExchangeSettings) rabbithole.ExchangeSettings {
+func generateExchangeSettings(spec *v1alpha1.ExchangeSettings) rabbithole.ExchangeSettings {
 	if spec == nil {
 		settings := rabbithole.ExchangeSettings{}
 		// Default value (Type is required in rabbitMq api)
@@ -284,15 +277,31 @@ func generateExchangeOptions(spec *v1alpha1.ExchangeSettings) rabbithole.Exchang
 		// Default value (Type is required in rabbitMq api)
 		settings.Type = exchangeDefaultType
 	}
-
 	if spec.Durable != nil {
 		settings.Durable = *spec.Durable
 	}
-
 	if spec.AutoDelete != nil {
 		settings.AutoDelete = *spec.AutoDelete
 	}
+	if spec.Arguments != nil {
+		settings.Arguments = rabbitmqclient.ConvertStringMapToInterfaceMap(spec.Arguments)
+	}
 	return settings
+}
+
+func generateExchangeObservation(api *rabbithole.DetailedExchangeInfo) v1alpha1.ExchangeObservation {
+	if api == nil {
+		return v1alpha1.ExchangeObservation{}
+	}
+	exchange := v1alpha1.ExchangeObservation{
+		Name:       api.Name,
+		Vhost:      api.Vhost,
+		Type:       api.Type,
+		Durable:    api.Durable,
+		AutoDelete: api.AutoDelete,
+		Arguments:  rabbitmqclient.ConvertInterfaceMapToStringMap(api.Arguments),
+	}
+	return exchange
 }
 
 func isUpToDate(spec *v1alpha1.ExchangeParameters, api *rabbithole.DetailedExchangeInfo) bool { //nolint:gocyclo
@@ -306,14 +315,8 @@ func isUpToDate(spec *v1alpha1.ExchangeParameters, api *rabbithole.DetailedExcha
 		if !rabbitmqclient.IsBoolPtrEqualToBool(spec.ExchangeSettings.AutoDelete, api.AutoDelete) {
 			return false
 		}
+		argumentsUpToDate, _ := rabbitmqclient.MapsEqualJSON(spec.ExchangeSettings.Arguments, rabbitmqclient.ConvertInterfaceMapToStringMap(api.Arguments))
+		return argumentsUpToDate
 	}
 	return true
-}
-
-func getExternalName(spec *v1alpha1.Exchange) string {
-	forProviderName := spec.Spec.ForProvider.Name
-	if forProviderName != nil {
-		return *forProviderName
-	}
-	return spec.Name
 }

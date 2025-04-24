@@ -75,6 +75,10 @@ spec:
                 properties:
                   exchangeSettings:
                     properties:
+                      arguments:
+                        additionalProperties:
+                          type: string
+                        type: object
                       autoDelete:
                         type: boolean
                       durable:
@@ -262,6 +266,10 @@ spec:
               atProvider:
                 description: ExchangeObservation are the observable fields of a Exchange.
                 properties:
+                  arguments:
+                    additionalProperties:
+                      type: string
+                    type: object
                   autoDelete:
                     type: boolean
                   durable:

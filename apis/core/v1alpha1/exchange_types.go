@@ -33,18 +33,20 @@ type ExchangeParameters struct {
 }
 
 type ExchangeSettings struct {
-	Type       *string `json:"type,omitempty"`
-	Durable    *bool   `json:"durable,omitempty"`
-	AutoDelete *bool   `json:"autoDelete,omitempty"`
+	Type       *string           `json:"type,omitempty"`
+	Durable    *bool             `json:"durable,omitempty"`
+	AutoDelete *bool             `json:"autoDelete,omitempty"`
+	Arguments  map[string]string `json:"arguments,omitempty"`
 }
 
 // ExchangeObservation are the observable fields of a Exchange.
 type ExchangeObservation struct {
-	Name       string `json:"name,omitempty"`
-	Vhost      string `json:"vhost,omitempty"`
-	Type       string `json:"type,omitempty"`
-	Durable    bool   `json:"durable,omitempty"`
-	AutoDelete bool   `json:"autoDelete,omitempty"`
+	Name       string            `json:"name,omitempty"`
+	Vhost      string            `json:"vhost,omitempty"`
+	Type       string            `json:"type,omitempty"`
+	Durable    bool              `json:"durable,omitempty"`
+	AutoDelete bool              `json:"autoDelete,omitempty"`
+	Arguments  map[string]string `json:"arguments,omitempty"`
 }
 
 // A ExchangeSpec defines the desired state of a Exchange.
