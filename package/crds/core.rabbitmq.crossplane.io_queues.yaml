@@ -96,6 +96,8 @@ spec:
                       rule: '!has(oldSelf.durable) || self.durable == oldSelf.durable'
                     - message: AutoDelete is immutable once set
                       rule: '!has(oldSelf.autoDelete) || self.autoDelete == oldSelf.autoDelete'
+                    - message: Arguments are immutable once set
+                      rule: '!has(oldSelf.arguments) || self.arguments == oldSelf.arguments'
                   vhost:
                     type: string
                 required:
