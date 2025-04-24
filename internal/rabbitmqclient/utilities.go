@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"strconv"
 
 	"github.com/google/go-cmp/cmp"
 )
@@ -61,7 +62,11 @@ func IsStringPtrEqualToString(sp *string, s string) bool {
 func ConvertStringMapToInterfaceMap(m map[string]string) map[string]interface{} {
 	finalMap := make(map[string]interface{}, len(m))
 	for k, v := range m {
-		finalMap[k] = v
+		if integerValue, err := strconv.Atoi(v); err == nil {
+			finalMap[k] = integerValue
+		} else {
+			finalMap[k] = v
+		}
 	}
 	return finalMap
 }
