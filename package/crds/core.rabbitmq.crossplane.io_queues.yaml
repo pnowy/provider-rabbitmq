@@ -106,7 +106,7 @@ spec:
                 x-kubernetes-validations:
                 - message: Name is immutable once set
                   rule: '!has(oldSelf.name) || self.name == oldSelf.name'
-                - message: Vhost is immutable once
+                - message: Vhost is immutable once set
                   rule: '!has(oldSelf.vhost) || self.vhost == oldSelf.vhost'
               managementPolicies:
                 default:
