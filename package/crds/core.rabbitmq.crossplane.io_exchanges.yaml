@@ -74,6 +74,7 @@ spec:
                 description: ExchangeParameters are the configurable fields of a Exchange.
                 properties:
                   exchangeSettings:
+                    description: ExchangeSettings
                     properties:
                       arguments:
                         additionalProperties:
@@ -86,6 +87,15 @@ spec:
                       type:
                         type: string
                     type: object
+                    x-kubernetes-validations:
+                    - message: Type is immutable once set
+                      rule: '!has(oldSelf.type) || self.type == oldSelf.type'
+                    - message: Durable is immutable once set
+                      rule: '!has(oldSelf.durable) || self.durable == oldSelf.durable'
+                    - message: AutoDelete is immutable once set
+                      rule: '!has(oldSelf.autoDelete) || self.autoDelete == oldSelf.autoDelete'
+                    - message: Arguments are immutable once set
+                      rule: '!has(oldSelf.arguments) || self.arguments == oldSelf.arguments'
                   name:
                     type: string
                   vhost:

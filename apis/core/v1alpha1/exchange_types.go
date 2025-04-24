@@ -32,6 +32,12 @@ type ExchangeParameters struct {
 	ExchangeSettings *ExchangeSettings `json:"exchangeSettings,omitempty"`
 }
 
+// ExchangeSettings
+// +kubebuilder:validation:Required
+// +kubebuilder:validation:XValidation:rule="!has(oldSelf.type) || self.type == oldSelf.type",message="Type is immutable once set"
+// +kubebuilder:validation:XValidation:rule="!has(oldSelf.durable) || self.durable == oldSelf.durable",message="Durable is immutable once set"
+// +kubebuilder:validation:XValidation:rule="!has(oldSelf.autoDelete) || self.autoDelete == oldSelf.autoDelete",message="AutoDelete is immutable once set"
+// +kubebuilder:validation:XValidation:rule="!has(oldSelf.arguments) || self.arguments == oldSelf.arguments",message="Arguments are immutable once set"
 type ExchangeSettings struct {
 	Type       *string           `json:"type,omitempty"`
 	Durable    *bool             `json:"durable,omitempty"`
