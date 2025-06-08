@@ -19,6 +19,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"time"
@@ -71,10 +72,14 @@ func main() {
 	zl := zap.New(zap.UseDevMode(*debug))
 	log := logging.NewLogrLogger(zl.WithName("provider-rabbitmq"))
 	if *debug {
-		// The controller-runtime runs with a no-op logger by default. It is
-		// *very* verbose even at info level, so we only provide it a real
-		// logger when we're running in debug mode.
+		// The controller-runtime is *very* verbose even at info level, so we only
+		// provide it a real logger when we're running in debug mode.
 		ctrl.SetLogger(zl)
+	} else {
+		// Setting the controller-runtime logger to a no-op logger by default. This
+		// is not really needed, but otherwise we get a warning from the
+		// controller-runtime.
+		ctrl.SetLogger(zap.New(zap.WriteTo(io.Discard)))
 	}
 
 	cfg, err := ctrl.GetConfig()
@@ -145,7 +150,7 @@ func main() {
 		clo := controller.ChangeLogOptions{
 			ChangeLogger: managed.NewGRPCChangeLogger(
 				changelogsv1alpha1.NewChangeLogServiceClient(conn),
-				managed.WithProviderVersion(fmt.Sprintf("provider-template: %s", version.Version))),
+				managed.WithProviderVersion(fmt.Sprintf("provider-template:%s", version.Version))),
 		}
 		o.ChangeLogOptions = &clo
 	}
