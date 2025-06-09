@@ -18,9 +18,15 @@ package main
 
 import (
 	"context"
+	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
 	"gopkg.in/alecthomas/kingpin.v2"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
@@ -30,6 +36,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
+	changelogsv1alpha1 "github.com/crossplane/crossplane-runtime/apis/changelogs/proto/v1alpha1"
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/controller"
 	"github.com/crossplane/crossplane-runtime/pkg/feature"
@@ -41,6 +48,7 @@ import (
 	"github.com/pnowy/provider-rabbitmq/apis/v1alpha1"
 	rabbitmq "github.com/pnowy/provider-rabbitmq/internal/controller"
 	"github.com/pnowy/provider-rabbitmq/internal/features"
+	"github.com/pnowy/provider-rabbitmq/internal/version"
 )
 
 func main() {
@@ -56,16 +64,22 @@ func main() {
 		namespace                  = app.Flag("namespace", "Namespace used to set as default scope in default secret store config.").Default("crossplane-system").Envar("POD_NAMESPACE").String()
 		enableExternalSecretStores = app.Flag("enable-external-secret-stores", "Enable support for ExternalSecretStores.").Default("false").Envar("ENABLE_EXTERNAL_SECRET_STORES").Bool()
 		enableManagementPolicies   = app.Flag("enable-management-policies", "Enable support for Management Policies.").Default("false").Envar("ENABLE_MANAGEMENT_POLICIES").Bool()
+		enableChangeLogs           = app.Flag("enable-change-logs", "Enable support for capturing change logs during reconciliation.").Default("false").Envar("ENABLE_CHANGE_LOGS").Bool()
+		changelogsSocketPath       = app.Flag("changelogs-socket-path", "Path for changelogs socket (if enabled)").Default("/var/run/changelogs/changelogs.sock").Envar("CHANGELOGS_SOCKET_PATH").String()
 	)
 	kingpin.MustParse(app.Parse(os.Args[1:]))
 
 	zl := zap.New(zap.UseDevMode(*debug))
 	log := logging.NewLogrLogger(zl.WithName("provider-rabbitmq"))
 	if *debug {
-		// The controller-runtime runs with a no-op logger by default. It is
-		// *very* verbose even at info level, so we only provide it a real
-		// logger when we're running in debug mode.
+		// The controller-runtime is *very* verbose even at info level, so we only
+		// provide it a real logger when we're running in debug mode.
 		ctrl.SetLogger(zl)
+	} else {
+		// Setting the controller-runtime logger to a no-op logger by default. This
+		// is not really needed, but otherwise we get a warning from the
+		// controller-runtime.
+		ctrl.SetLogger(zap.New(zap.WriteTo(io.Discard)))
 	}
 
 	cfg, err := ctrl.GetConfig()
@@ -124,6 +138,21 @@ func main() {
 	if *enableManagementPolicies {
 		o.Features.Enable(features.EnableAlphaManagementPolicies)
 		log.Info("Alpha feature enabled", "flag", features.EnableAlphaManagementPolicies)
+	}
+
+	if *enableChangeLogs {
+		o.Features.Enable(feature.EnableAlphaChangeLogs)
+		log.Info("Alpha feature enabled", "flag", feature.EnableAlphaChangeLogs)
+
+		conn, err := grpc.NewClient("unix://"+*changelogsSocketPath, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		kingpin.FatalIfError(err, "failed to create change logs client connection in %s", *changelogsSocketPath)
+
+		clo := controller.ChangeLogOptions{
+			ChangeLogger: managed.NewGRPCChangeLogger(
+				changelogsv1alpha1.NewChangeLogServiceClient(conn),
+				managed.WithProviderVersion(fmt.Sprintf("provider-template:%s", version.Version))),
+		}
+		o.ChangeLogOptions = &clo
 	}
 
 	kingpin.FatalIfError(rabbitmq.Setup(mgr, o), "Cannot setup RabbitMq controllers")
