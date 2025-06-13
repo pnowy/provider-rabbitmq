@@ -35,7 +35,7 @@ metadata:
   name: provider-rabbitmq
   namespace: crossplane-system
 spec:
-  package: ghcr.io/pnowy/provider-rabbitmq:PROVIDER_VERSION
+  package: xpkg.upbound.io/pnowy/provider-rabbitmq:PROVIDER_VERSION
 ```
 
 This will install the provider in the `crossplane-system` namespace and install CRDs and controllers for the provider.
@@ -65,7 +65,7 @@ metadata:
   name: provider-rabbitmq
   namespace: crossplane-system
 spec:
-  package: ghcr.io/pnowy/provider-rabbitmq:PROVIDER_VERSION
+  package: xpkg.upbound.io/pnowy/provider-rabbitmq:PROVIDER_VERSION
   controllerConfigRef:
     name: provider-rabbitmq
 ```
