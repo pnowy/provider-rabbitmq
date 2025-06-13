@@ -31,17 +31,17 @@ GOLANGCILINT_VERSION = 2.1.2
 
 # ====================================================================================
 # Setup Images
-REGISTRY_ORGS ?= ghcr.io
+REGISTRY_ORGS ?= xpkg.upbound.io
 IMAGES = provider-rabbitmq
 -include build/makelib/imagelight.mk
 
 # ====================================================================================
 # Setup XPKG
 
-XPKG_REG_ORGS ?= ghcr.io/pnowy
+XPKG_REG_ORGS ?= xpkg.upbound.io/pnowy
 # NOTE(hasheddan): skip promoting on xpkg.upbound.io as channel tags are
 # inferred.
-XPKG_REG_ORGS_NO_PROMOTE ?= ghcr.io/pnowy
+XPKG_REG_ORGS_NO_PROMOTE ?= xpkg.upbound.io/pnowy
 XPKGS = provider-rabbitmq
 -include build/makelib/xpkg.mk
 
