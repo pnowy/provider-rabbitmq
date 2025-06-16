@@ -104,6 +104,7 @@ metadata:
 spec:
   package: xpkg.upbound.io/pnowy/provider-rabbitmq:v0.5.0
 #  package: "${PACKAGE_CONTROLLER_IMAGE}"
+EOF
 )"
 
 echo "${INSTALL_YAML}" | "${KUBECTL}" apply -f -
