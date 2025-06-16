@@ -35,13 +35,6 @@ UPTEST_VERSION = v1.4.0
 CHAINSAW_VERSION = 0.2.12
 -include build/makelib/k8s_tools.mk
 
-$(UPTEST):
-	@$(INFO) installing uptest $(UPTEST_VERSION)
-	@mkdir -p $(TOOLS_HOST_DIR)
-	@curl -fsSLo $(UPTEST) https://github.com/crossplane/uptest/releases/download/$(UPTEST_VERSION)/uptest_$(SAFEHOSTPLATFORM) || $(FAIL)
-	@chmod +x $(UPTEST)
-	@$(OK) installing uptest $(UPTEST)
-
 # ====================================================================================
 # Setup Images
 REGISTRY_ORGS ?= xpkg.upbound.io
