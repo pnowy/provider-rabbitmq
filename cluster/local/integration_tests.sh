@@ -122,7 +122,7 @@ kubectl apply -f "${projectdir}/examples/provider/config.yaml"
 echo_success "RabbitMQ is ready!"
 
 echo_step "Running integration tests"
-#make uptest
+make uptest
 
 # uninstall provider
 if [ "$skipcleanup" != true ]; then
