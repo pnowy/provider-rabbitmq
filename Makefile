@@ -61,7 +61,7 @@ XPKGS = provider-rabbitmq
 
 UPTEST_LOCAL_DEPLOY_TARGET = local.xpkg.deploy.configuration.$(PROJECT_NAME)
 SAMPLES=examples/sample
-UPTEST_INPUT_MANIFESTS=${SAMPLES}/vhost.yaml,${SAMPLES}/queue.yaml,${SAMPLES}/exchange.yaml,${SAMPLES}/user-secret-pass.yaml
+UPTEST_INPUT_MANIFESTS=${SAMPLES}/vhost.yaml,${SAMPLES}/queue.yaml,${SAMPLES}/exchange.yaml,${SAMPLES}/user-secret-pass.yaml,${SAMPLES}/permissions.yaml
 UPTEST_RENDER_ONLY = false
 -include build/makelib/uptest.mk
 
