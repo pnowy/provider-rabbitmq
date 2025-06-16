@@ -32,10 +32,8 @@ echo_error(){
     exit 1
 }
 
-
 # The name of your provider. Many provider Makefiles override this value.
 PACKAGE_NAME="provider-rabbitmq"
-
 
 # ------------------------------
 projectdir="$( cd "$( dirname "${BASH_SOURCE[0]}")"/../.. && pwd )"
@@ -48,11 +46,11 @@ eval $(make --no-print-directory -C ${projectdir} build.vars)
 SAFEHOSTARCH="${SAFEHOSTARCH:-amd64}"
 BUILD_IMAGE="${BUILD_REGISTRY}/${PROJECT_NAME}-${SAFEHOSTARCH}"
 PACKAGE_IMAGE="crossplane.io/inttests/${PROJECT_NAME}:${VERSION}"
-CONTROLLER_IMAGE="${BUILD_REGISTRY}/${PROJECT_NAME}-controller-${SAFEHOSTARCH}"
+CONTROLLER_IMAGE="${BUILD_REGISTRY}/${PROJECT_NAME}-${SAFEHOSTARCH}"
 
 version_tag="$(cat ${projectdir}/_output/version)"
 # tag as latest version to load into kind cluster
-PACKAGE_CONTROLLER_IMAGE="${DOCKER_REGISTRY}/${PROJECT_NAME}-controller:${VERSION}"
+PACKAGE_CONTROLLER_IMAGE="${DOCKER_REGISTRY}/${PROJECT_NAME}:${VERSION}"
 K8S_CLUSTER="${K8S_CLUSTER:-${BUILD_REGISTRY}-inttests}"
 
 CROSSPLANE_NAMESPACE="crossplane-system"
@@ -68,13 +66,7 @@ if [ "$skipcleanup" != true ]; then
   trap cleanup EXIT
 fi
 
-# setup package cache
-echo_step "setting up local package cache"
-CACHE_PATH="${projectdir}/.work/inttest-package-cache"
-mkdir -p "${CACHE_PATH}"
-echo "created cache dir at ${CACHE_PATH}"
 docker tag "${BUILD_IMAGE}" "${PACKAGE_IMAGE}"
-"${UP}" xpkg xp-extract --from-daemon "${PACKAGE_IMAGE}" -o "${CACHE_PATH}/${PACKAGE_NAME}.gz" && chmod 644 "${CACHE_PATH}/${PACKAGE_NAME}.gz"
 
 # create kind cluster with extra mounts
 KIND_NODE_IMAGE="kindest/node:${KIND_NODE_IMAGE_TAG}"
@@ -84,67 +76,27 @@ kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 nodes:
 - role: control-plane
-  extraMounts:
-  - hostPath: "${CACHE_PATH}/"
-    containerPath: /cache
 EOF
 )"
 echo "${KIND_CONFIG}" | "${KIND}" create cluster --name="${K8S_CLUSTER}" --wait=5m --image="${KIND_NODE_IMAGE}" --config=-
 
 # tag controller image and load it into kind cluster
+echo_step "loading controller image into kind cluster, CONTROLLER_IMAGE=${CONTROLLER_IMAGE} PACKAGE_CONTROLLER_IMAGE=${PACKAGE_CONTROLLER_IMAGE}"
 docker tag "${CONTROLLER_IMAGE}" "${PACKAGE_CONTROLLER_IMAGE}"
 "${KIND}" load docker-image "${PACKAGE_CONTROLLER_IMAGE}" --name="${K8S_CLUSTER}"
 
 echo_step "create crossplane-system namespace"
 "${KUBECTL}" create ns crossplane-system
 
-echo_step "create persistent volume and claim for mounting package-cache"
-PV_YAML="$( cat <<EOF
-apiVersion: v1
-kind: PersistentVolume
-metadata:
-  name: package-cache
-  labels:
-    type: local
-spec:
-  storageClassName: manual
-  capacity:
-    storage: 5Mi
-  accessModes:
-    - ReadWriteOnce
-  hostPath:
-    path: "/cache"
-EOF
-)"
-echo "${PV_YAML}" | "${KUBECTL}" create -f -
-
-PVC_YAML="$( cat <<EOF
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: package-cache
-  namespace: crossplane-system
-spec:
-  accessModes:
-    - ReadWriteOnce
-  volumeName: package-cache
-  storageClassName: manual
-  resources:
-    requests:
-      storage: 1Mi
-EOF
-)"
-echo "${PVC_YAML}" | "${KUBECTL}" create -f -
-
 # install crossplane from stable channel
 echo_step "installing crossplane from stable channel"
-"${HELM3}" repo add crossplane-stable https://charts.crossplane.io/stable/
-chart_version="$("${HELM3}" search repo crossplane-stable/crossplane | awk 'FNR == 2 {print $2}')"
+helm repo add crossplane-stable https://charts.crossplane.io/stable/
+chart_version="$(helm search repo crossplane-stable/crossplane | awk 'FNR == 2 {print $2}')"
 echo_info "using crossplane version ${chart_version}"
 echo
 # we replace empty dir with our PVC so that the /cache dir in the kind node
 # container is exposed to the crossplane pod
-"${HELM3}" install crossplane --namespace crossplane-system crossplane-stable/crossplane --version ${chart_version} --wait --set packageCache.pvc=package-cache
+helm install crossplane --namespace crossplane-system crossplane-stable/crossplane --version ${chart_version} --wait
 
 # ----------- integration tests
 echo_step "--- INTEGRATION TESTS ---"
@@ -158,36 +110,44 @@ kind: Provider
 metadata:
   name: "${PACKAGE_NAME}"
 spec:
-  package: "${PACKAGE_NAME}"
-  packagePullPolicy: Never
+  package: xpkg.upbound.io/pnowy/provider-rabbitmq:v0.5.0
 EOF
 )"
 
 echo "${INSTALL_YAML}" | "${KUBECTL}" apply -f -
 
-# printing the cache dir contents can be useful for troubleshooting failures
-echo_step "check kind node cache dir contents"
-docker exec "${K8S_CLUSTER}-control-plane" ls -la /cache
-
 echo_step "waiting for provider to be installed"
-
 kubectl wait "provider.pkg.crossplane.io/${PACKAGE_NAME}" --for=condition=healthy --timeout=180s
 
-echo_step "uninstalling ${PROJECT_NAME}"
+echo_step "Installing RabbitMQ"
+HELM_DIR="${projectdir}/helm/rabbitmq"
+helm dep update "${HELM_DIR}"
+helm upgrade rabbitmq "${HELM_DIR}" --install --namespace rabbitmq --create-namespace --wait
 
-echo "${INSTALL_YAML}" | "${KUBECTL}" delete -f -
+echo_step "RabbitMQ provider config"
+kubectl apply -f "${projectdir}/examples/provider/config.yaml"
+echo_success "RabbitMQ is ready!"
 
-# check pods deleted
-timeout=60
-current=0
-step=3
-while [[ $(kubectl get providerrevision.pkg.crossplane.io -o name | wc -l) != "0" ]]; do
-  echo "waiting for provider to be deleted for another $step seconds"
-  current=$current+$step
-  if ! [[ $timeout > $current ]]; then
-    echo_error "timeout of ${timeout}s has been reached"
-  fi
-  sleep $step;
-done
+echo_step "Running integration tests"
+#make uptest
+
+# uninstall provider
+if [ "$skipcleanup" != true ]; then
+  echo_step "uninstalling ${PROJECT_NAME}"
+  echo "${INSTALL_YAML}" | "${KUBECTL}" delete -f -
+  # check pods deleted
+  timeout=60
+  current=0
+  step=3
+  while [[ $(kubectl get providerrevision.pkg.crossplane.io -o name | wc -l | tr -d '[:space:]') != "0" ]]; do
+    echo "waiting for provider to be deleted for another $step seconds"
+    current=$current+$step
+    if ! [[ $timeout > $current ]]; then
+      echo_error "timeout of ${timeout}s has been reached"
+    fi
+    sleep $step;
+  done
+fi
+
 
 echo_success "Integration tests succeeded!"
