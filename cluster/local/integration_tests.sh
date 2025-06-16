@@ -85,13 +85,10 @@ echo_step "loading controller image into kind cluster, CONTROLLER_IMAGE=${CONTRO
 docker tag "${CONTROLLER_IMAGE}" "${PACKAGE_CONTROLLER_IMAGE}"
 "${KIND}" load docker-image "${PACKAGE_CONTROLLER_IMAGE}" --name="${K8S_CLUSTER}"
 
-echo_step "create crossplane-system namespace"
-"${KUBECTL}" create ns crossplane-system
-
 # install crossplane
 CROSSPLANE_HELM_DIR="${projectdir}/helm/crossplane"
 helm dep update "${CROSSPLANE_HELM_DIR}"
-helm upgrade crossplane "${CROSSPLANE_HELM_DIR}" --install --namespace crossplane-system --create-namespace --wait
+helm upgrade crossplane "${CROSSPLANE_HELM_DIR}" --install --namespace "$CROSSPLANE_NAMESPACE" --create-namespace --wait
 
 # install package
 echo_step "installing ${PROJECT_NAME} into \"${CROSSPLANE_NAMESPACE}\" namespace"
@@ -122,7 +119,7 @@ kubectl apply -f "${projectdir}/examples/provider/config.yaml"
 echo_success "RabbitMQ is ready!"
 
 echo_step "Running integration tests"
-make uptest
+CROSSPLANE_NAMESPACE="$CROSSPLANE_NAMESPACE" make uptest
 
 # uninstall provider
 if [ "$skipcleanup" != true ]; then
