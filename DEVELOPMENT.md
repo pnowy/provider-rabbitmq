@@ -85,6 +85,8 @@ This will:
 
 The integration tests use the uptest framework to run tests against the provider.
 
+Update `UPTEST_INPUT_MANIFESTS` if you want to include extra manifests for tests.
+
 ## References
 
 Refer to Crossplane's [CONTRIBUTING.md](https://github.com/crossplane/crossplane/blob/master/CONTRIBUTING.md) file for more information on how the Crossplane
