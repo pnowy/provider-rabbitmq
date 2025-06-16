@@ -32,8 +32,11 @@ echo_error(){
     exit 1
 }
 
-# The name of your provider. Many provider Makefiles override this value.
+PROVIDER_VERSION="v0.5.0"
 PACKAGE_NAME="provider-rabbitmq"
+
+echo_step "Testing provider version=$PROVIDER_VERSION (no offline testing possible)"
+# see https://docs.crossplane.io/latest/concepts/providers/#install-offline
 
 # ------------------------------
 projectdir="$( cd "$( dirname "${BASH_SOURCE[0]}")"/../.. && pwd )"
@@ -99,8 +102,8 @@ kind: Provider
 metadata:
   name: "${PACKAGE_NAME}"
 spec:
-  package: xpkg.upbound.io/pnowy/provider-rabbitmq:v0.5.0
-#  package: "${PACKAGE_CONTROLLER_IMAGE}"
+  package: xpkg.upbound.io/pnowy/provider-rabbitmq:${PROVIDER_VERSION}
+  # package: "${PACKAGE_CONTROLLER_IMAGE}"
 EOF
 )"
 
