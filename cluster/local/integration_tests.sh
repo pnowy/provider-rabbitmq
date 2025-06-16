@@ -88,18 +88,10 @@ docker tag "${CONTROLLER_IMAGE}" "${PACKAGE_CONTROLLER_IMAGE}"
 echo_step "create crossplane-system namespace"
 "${KUBECTL}" create ns crossplane-system
 
-# install crossplane from stable channel
-echo_step "installing crossplane from stable channel"
-helm repo add crossplane-stable https://charts.crossplane.io/stable/
-chart_version="$(helm search repo crossplane-stable/crossplane | awk 'FNR == 2 {print $2}')"
-echo_info "using crossplane version ${chart_version}"
-echo
-# we replace empty dir with our PVC so that the /cache dir in the kind node
-# container is exposed to the crossplane pod
-helm install crossplane --namespace crossplane-system crossplane-stable/crossplane --version ${chart_version} --wait
-
-# ----------- integration tests
-echo_step "--- INTEGRATION TESTS ---"
+# install crossplane
+CROSSPLANE_HELM_DIR="${projectdir}/helm/crossplane"
+helm dep update "${CROSSPLANE_HELM_DIR}"
+helm upgrade crossplane "${CROSSPLANE_HELM_DIR}" --install --namespace crossplane-system --create-namespace --wait
 
 # install package
 echo_step "installing ${PROJECT_NAME} into \"${CROSSPLANE_NAMESPACE}\" namespace"
@@ -111,7 +103,7 @@ metadata:
   name: "${PACKAGE_NAME}"
 spec:
   package: xpkg.upbound.io/pnowy/provider-rabbitmq:v0.5.0
-EOF
+#  package: "${PACKAGE_CONTROLLER_IMAGE}"
 )"
 
 echo "${INSTALL_YAML}" | "${KUBECTL}" apply -f -
@@ -120,9 +112,9 @@ echo_step "waiting for provider to be installed"
 kubectl wait "provider.pkg.crossplane.io/${PACKAGE_NAME}" --for=condition=healthy --timeout=180s
 
 echo_step "Installing RabbitMQ"
-HELM_DIR="${projectdir}/helm/rabbitmq"
-helm dep update "${HELM_DIR}"
-helm upgrade rabbitmq "${HELM_DIR}" --install --namespace rabbitmq --create-namespace --wait
+RABBITMQ_HELM_DIR="${projectdir}/helm/rabbitmq"
+helm dep update "${RABBITMQ_HELM_DIR}"
+helm upgrade rabbitmq "${RABBITMQ_HELM_DIR}" --install --namespace rabbitmq --create-namespace --wait
 
 echo_step "RabbitMQ provider config"
 kubectl apply -f "${projectdir}/examples/provider/config.yaml"
