@@ -213,6 +213,11 @@ jobs:
       - name: Download Go Modules
         run: make modules.download modules.check
 
+      - name: Build Artifacts
+        run: make -j2 build.all
+        env:
+          BUILD_ARGS: "--load"
+
       - name: Run Integration Tests
         run: make test-integration
 
