@@ -27,12 +27,19 @@ GOLANGCILINT_VERSION = 2.1.2
 # ====================================================================================
 # Setup Kubernetes tools
 
+KIND_VERSION = v0.29.0
+KIND_NODE_IMAGE_TAG = v1.33.1
+KUBECTL_VERSION = v1.30.13
+CROSSPLANE_CLI_VERSION = v1.20.0
+UPTEST_VERSION = v1.4.0
+CHAINSAW_VERSION = 0.2.12
 -include build/makelib/k8s_tools.mk
 
 # ====================================================================================
 # Setup Images
 REGISTRY_ORGS ?= xpkg.upbound.io
 IMAGES = provider-rabbitmq
+DOCKER_REGISTRY = crossplane
 -include build/makelib/imagelight.mk
 
 # ====================================================================================
@@ -44,6 +51,12 @@ XPKG_REG_ORGS ?= xpkg.upbound.io/pnowy
 XPKG_REG_ORGS_NO_PROMOTE ?= xpkg.upbound.io/pnowy
 XPKGS = provider-rabbitmq
 -include build/makelib/xpkg.mk
+
+UPTEST_LOCAL_DEPLOY_TARGET = local.xpkg.deploy.configuration.$(PROJECT_NAME)
+SAMPLES=examples/sample
+UPTEST_INPUT_MANIFESTS=${SAMPLES}/vhost.yaml,${SAMPLES}/queue.yaml,${SAMPLES}/exchange.yaml,${SAMPLES}/user-secret-pass.yaml,${SAMPLES}/permissions.yaml
+UPTEST_RENDER_ONLY = false
+-include build/makelib/uptest.mk
 
 # NOTE(hasheddan): we force image building to happen prior to xpkg build so that
 # we ensure image is present in daemon.
