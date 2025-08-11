@@ -16,7 +16,7 @@ spec:
     listKind: VhostList
     plural: vhosts
     singular: vhost
-  scope: Cluster
+  scope: Namespaced
   versions:
   - additionalPrinterColumns:
     - jsonPath: .status.conditions[?(@.type=='Ready')].status
