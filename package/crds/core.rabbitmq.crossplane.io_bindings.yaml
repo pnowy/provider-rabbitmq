@@ -16,7 +16,7 @@ spec:
     listKind: BindingList
     plural: bindings
     singular: binding
-  scope: Cluster
+  scope: Namespaced
   versions:
   - additionalPrinterColumns:
     - jsonPath: .status.conditions[?(@.type=='Ready')].status

@@ -16,7 +16,7 @@ spec:
     listKind: UserList
     plural: users
     singular: user
-  scope: Cluster
+  scope: Namespaced
   versions:
   - additionalPrinterColumns:
     - jsonPath: .status.conditions[?(@.type=='Ready')].status

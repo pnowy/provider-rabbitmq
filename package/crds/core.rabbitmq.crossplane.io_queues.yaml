@@ -16,7 +16,7 @@ spec:
     listKind: QueueList
     plural: queues
     singular: queue
-  scope: Cluster
+  scope: Namespaced
   versions:
   - additionalPrinterColumns:
     - jsonPath: .status.conditions[?(@.type=='Ready')].status

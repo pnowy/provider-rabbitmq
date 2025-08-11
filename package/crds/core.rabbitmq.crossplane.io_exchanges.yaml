@@ -16,7 +16,7 @@ spec:
     listKind: ExchangeList
     plural: exchanges
     singular: exchange
-  scope: Cluster
+  scope: Namespaced
   versions:
   - additionalPrinterColumns:
     - jsonPath: .status.conditions[?(@.type=='Ready')].status

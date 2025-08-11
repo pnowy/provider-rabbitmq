@@ -16,7 +16,7 @@ spec:
     listKind: PermissionsList
     plural: permissions
     singular: permissions
-  scope: Cluster
+  scope: Namespaced
   versions:
   - additionalPrinterColumns:
     - jsonPath: .status.conditions[?(@.type=='Ready')].status
