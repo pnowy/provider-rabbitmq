@@ -40,20 +40,24 @@ spec:
 
 This will install the provider in the `crossplane-system` namespace and install CRDs and controllers for the provider.
 
-### Controller config (optional)
+### Deployment runtime config (optional)
 
-In order to configure the provider controller, create a `ControllerConfig` resource:
+In order to configure the provider deployment runtime config, create a `DeploymentRuntimeConfig` resource:
 
 ```yaml
-apiVersion: pkg.crossplane.io/v1alpha1
-kind: ControllerConfig
+apiVersion: pkg.crossplane.io/v1beta1
+kind: DeploymentRuntimeConfig
 metadata:
   name: provider-rabbitmq
 spec:
-  tolerations:
-    - effect: NoSchedule
-      key: crossplane
-      operator: Exists
+  deploymentTemplate:
+    spec:
+      template:
+        spec:
+          tolerations:
+            - effect: NoSchedule
+              key: crossplane
+              operator: Exists
 ```
 
 which can be referenced in the provider definition:
@@ -66,7 +70,9 @@ metadata:
   namespace: crossplane-system
 spec:
   package: xpkg.upbound.io/pnowy/provider-rabbitmq:PROVIDER_VERSION
-  controllerConfigRef:
+  runtimeConfigRef:
+    apiVersion: pkg.crossplane.io/v1beta1
+    kind: DeploymentRuntimeConfig
     name: provider-rabbitmq
 ```
 

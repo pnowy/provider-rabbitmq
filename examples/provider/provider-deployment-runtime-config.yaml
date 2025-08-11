@@ -1,0 +1,25 @@
+apiVersion: pkg.crossplane.io/v1beta1
+kind: DeploymentRuntimeConfig
+metadata:
+  name: provider-rabbitmq
+spec:
+  deploymentTemplate:
+    spec:
+      template:
+        spec:
+          tolerations:
+            - effect: NoSchedule
+              key: crossplane
+              operator: Exists
+---
+apiVersion: pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  name: provider-rabbitmq
+  namespace: crossplane-system
+spec:
+  package: xpkg.upbound.io/pnowy/provider-rabbitmq:v0.5.0
+  runtimeConfigRef:
+    apiVersion: pkg.crossplane.io/v1beta1
+    kind: DeploymentRuntimeConfig
+    name: provider-rabbitmq
