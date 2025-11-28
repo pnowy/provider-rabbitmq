@@ -23,11 +23,13 @@ import (
 
 	"net/http"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-	"github.com/crossplane/crossplane-runtime/pkg/logging"
-	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
-	"github.com/crossplane/crossplane-runtime/pkg/resource"
-	"github.com/crossplane/crossplane-runtime/pkg/test"
+	"github.com/crossplane/crossplane-runtime/v2/apis/common"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	xpv2 "github.com/crossplane/crossplane-runtime/v2/apis/common/v2"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/logging"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
 	"github.com/google/go-cmp/cmp"
 	rabbithole "github.com/michaelklishin/rabbit-hole/v3"
 	pkgErrors "github.com/pkg/errors"
@@ -56,7 +58,7 @@ func TestConnect(t *testing.T) {
 	)
 	type fields struct {
 		kube         client.Client
-		usage        resource.Tracker
+		usage        *resource.ProviderConfigUsageTracker
 		newServiceFn func(creds []byte) (*rabbitmqclient.RabbitMqService, error)
 	}
 
@@ -90,11 +92,7 @@ func TestConnect(t *testing.T) {
 						return nil
 					},
 				},
-				usage: &fake.MockTracker{
-					MockTrack: func(ctx context.Context, mg resource.Managed) error {
-						return nil
-					},
-				},
+				usage: resource.NewProviderConfigUsageTracker(&fake.MockApplicator{}, &apisv1alpha1.ProviderConfigUsage{}),
 				newServiceFn: func(creds []byte) (*rabbitmqclient.RabbitMqService, error) {
 					return &rabbitmqclient.RabbitMqService{}, nil
 				},
@@ -102,9 +100,10 @@ func TestConnect(t *testing.T) {
 			args: args{
 				mg: &v1alpha1.Binding{
 					Spec: v1alpha1.BindingSpec{
-						ResourceSpec: xpv1.ResourceSpec{
-							ProviderConfigReference: &xpv1.Reference{
+						ManagedResourceSpec: xpv2.ManagedResourceSpec{
+							ProviderConfigReference: &common.ProviderConfigReference{
 								Name: "testing-provider-config",
+								Kind: "ProviderConfig",
 							},
 						},
 					},
@@ -128,11 +127,7 @@ func TestConnect(t *testing.T) {
 						return nil
 					},
 				},
-				usage: &fake.MockTracker{
-					MockTrack: func(ctx context.Context, mg resource.Managed) error {
-						return nil
-					},
-				},
+				usage: resource.NewProviderConfigUsageTracker(&fake.MockApplicator{}, &apisv1alpha1.ProviderConfigUsage{}),
 				newServiceFn: func(creds []byte) (*rabbitmqclient.RabbitMqService, error) {
 					return &rabbitmqclient.RabbitMqService{}, nil
 				},
@@ -140,9 +135,10 @@ func TestConnect(t *testing.T) {
 			args: args{
 				mg: &v1alpha1.Binding{
 					Spec: v1alpha1.BindingSpec{
-						ResourceSpec: xpv1.ResourceSpec{
-							ProviderConfigReference: &xpv1.Reference{
+						ManagedResourceSpec: xpv2.ManagedResourceSpec{
+							ProviderConfigReference: &common.ProviderConfigReference{
 								Name: "testing-provider-config",
+								Kind: "ProviderConfig",
 							},
 						},
 					},
@@ -167,11 +163,7 @@ func TestConnect(t *testing.T) {
 						return nil
 					},
 				},
-				usage: &fake.MockTracker{
-					MockTrack: func(ctx context.Context, mg resource.Managed) error {
-						return nil
-					},
-				},
+				usage: resource.NewProviderConfigUsageTracker(&fake.MockApplicator{}, &apisv1alpha1.ProviderConfigUsage{}),
 				newServiceFn: func(creds []byte) (*rabbitmqclient.RabbitMqService, error) {
 					return &rabbitmqclient.RabbitMqService{}, nil
 				},
@@ -179,9 +171,10 @@ func TestConnect(t *testing.T) {
 			args: args{
 				mg: &v1alpha1.Binding{
 					Spec: v1alpha1.BindingSpec{
-						ResourceSpec: xpv1.ResourceSpec{
-							ProviderConfigReference: &xpv1.Reference{
+						ManagedResourceSpec: xpv2.ManagedResourceSpec{
+							ProviderConfigReference: &common.ProviderConfigReference{
 								Name: "testing-provider-config",
+								Kind: "ProviderConfig",
 							},
 						},
 					},
@@ -208,11 +201,7 @@ func TestConnect(t *testing.T) {
 						return nil
 					},
 				},
-				usage: &fake.MockTracker{
-					MockTrack: func(ctx context.Context, mg resource.Managed) error {
-						return nil
-					},
-				},
+				usage: resource.NewProviderConfigUsageTracker(&fake.MockApplicator{}, &apisv1alpha1.ProviderConfigUsage{}),
 				newServiceFn: func(creds []byte) (*rabbitmqclient.RabbitMqService, error) {
 					return &rabbitmqclient.RabbitMqService{}, errors.New("Error in RabbitmqService NewClient")
 				},
@@ -220,56 +209,16 @@ func TestConnect(t *testing.T) {
 			args: args{
 				mg: &v1alpha1.Binding{
 					Spec: v1alpha1.BindingSpec{
-						ResourceSpec: xpv1.ResourceSpec{
-							ProviderConfigReference: &xpv1.Reference{
+						ManagedResourceSpec: xpv2.ManagedResourceSpec{
+							ProviderConfigReference: &common.ProviderConfigReference{
 								Name: "testing-provider-config",
+								Kind: "ProviderConfig",
 							},
 						},
 					},
 				},
 			},
 			want: pkgErrors.Wrap(errors.New("Error in RabbitmqService NewClient"), "cannot create new Service"),
-		},
-		"Error in Track": {
-			reason: "Error should be returned.",
-			fields: fields{
-				kube: &test.MockClient{
-					MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
-						switch o := obj.(type) {
-						case *apisv1alpha1.ProviderConfig:
-							o.Spec.Credentials.Source = credentialsSource
-							o.Spec.Credentials.SecretRef = &xpv1.SecretKeySelector{
-								Key: "creds",
-							}
-						case *corev1.Secret:
-							o.Data = map[string][]byte{
-								"creds": []byte("{\"APIKey\":\"foo\",\"Email\":\"foo@bar.com\"}"),
-							}
-						}
-						return nil
-					},
-				},
-				usage: &fake.MockTracker{
-					MockTrack: func(ctx context.Context, mg resource.Managed) error {
-						return errors.New("Error in Track")
-					},
-				},
-				newServiceFn: func(creds []byte) (*rabbitmqclient.RabbitMqService, error) {
-					return &rabbitmqclient.RabbitMqService{}, errors.New("Error in RabbitmqService NewClient")
-				},
-			},
-			args: args{
-				mg: &v1alpha1.Binding{
-					Spec: v1alpha1.BindingSpec{
-						ResourceSpec: xpv1.ResourceSpec{
-							ProviderConfigReference: &xpv1.Reference{
-								Name: "testing-provider-config",
-							},
-						},
-					},
-				},
-			},
-			want: pkgErrors.Wrap(errors.New("Error in Track"), "cannot track ProviderConfig usage"),
 		},
 		"Binding No found error ": {
 			reason: "We should return error",
@@ -290,11 +239,7 @@ func TestConnect(t *testing.T) {
 						return nil
 					},
 				},
-				usage: &fake.MockTracker{
-					MockTrack: func(ctx context.Context, mg resource.Managed) error {
-						return nil
-					},
-				},
+				usage: resource.NewProviderConfigUsageTracker(&test.MockClient{}, &apisv1alpha1.ProviderConfigUsage{}),
 				newServiceFn: func(creds []byte) (*rabbitmqclient.RabbitMqService, error) {
 					return &rabbitmqclient.RabbitMqService{}, nil
 				},

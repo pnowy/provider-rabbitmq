@@ -21,13 +21,15 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/crossplane/crossplane-runtime/v2/apis/common"
+	xpv2 "github.com/crossplane/crossplane-runtime/v2/apis/common/v2"
 	corev1 "k8s.io/api/core/v1"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-	"github.com/crossplane/crossplane-runtime/pkg/logging"
-	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
-	"github.com/crossplane/crossplane-runtime/pkg/resource"
-	"github.com/crossplane/crossplane-runtime/pkg/test"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/logging"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
 	"github.com/google/go-cmp/cmp"
 	rabbithole "github.com/michaelklishin/rabbit-hole/v3"
 	"github.com/pkg/errors"
@@ -696,7 +698,7 @@ func TestConnect(t *testing.T) {
 
 	type fields struct {
 		kube         client.Client
-		usage        resource.Tracker
+		usage        *resource.ProviderConfigUsageTracker
 		newServiceFn func(creds []byte) (*rabbitmqclient.RabbitMqService, error)
 		logger       logging.Logger
 	}
@@ -728,38 +730,22 @@ func TestConnect(t *testing.T) {
 				err: errors.New(errNotQueue),
 			},
 		},
-		"ErrTrackProviderConfigUsage": {
-			reason: "Should return error if we can't track ProviderConfig usage",
-			fields: fields{
-				usage: &fake.MockTracker{
-					MockTrack: func(ctx context.Context, mg resource.Managed) error { return errBoom },
-				},
-				logger: &fake.MockLog{},
-			},
-			args: args{
-				mg: &v1alpha1.Queue{},
-			},
-			want: want{
-				err: errors.Wrap(errBoom, errTrackPCUsage),
-			},
-		},
 		"ErrGetProviderConfig": {
 			reason: "Should return error if we can't get ProviderConfig",
 			fields: fields{
 				kube: &test.MockClient{
 					MockGet: test.NewMockGetFn(errBoom),
 				},
-				usage: &fake.MockTracker{
-					MockTrack: func(ctx context.Context, mg resource.Managed) error { return nil },
-				},
+				usage:  resource.NewProviderConfigUsageTracker(&fake.MockApplicator{}, &apisv1alpha1.ProviderConfigUsage{}),
 				logger: &fake.MockLog{},
 			},
 			args: args{
 				mg: &v1alpha1.Queue{
 					Spec: v1alpha1.QueueSpec{
-						ResourceSpec: xpv1.ResourceSpec{
-							ProviderConfigReference: &xpv1.Reference{
-								Name: "test",
+						ManagedResourceSpec: xpv2.ManagedResourceSpec{
+							ProviderConfigReference: &common.ProviderConfigReference{
+								Name: "testing-provider-config",
+								Kind: "ProviderConfig",
 							},
 						},
 					},
@@ -790,9 +776,7 @@ func TestConnect(t *testing.T) {
 						return nil
 					}),
 				},
-				usage: &fake.MockTracker{
-					MockTrack: func(ctx context.Context, mg resource.Managed) error { return nil },
-				},
+				usage: resource.NewProviderConfigUsageTracker(&fake.MockApplicator{}, &apisv1alpha1.ProviderConfigUsage{}),
 				newServiceFn: func(creds []byte) (*rabbitmqclient.RabbitMqService, error) {
 					return &rabbitmqclient.RabbitMqService{}, nil
 				},
@@ -801,9 +785,10 @@ func TestConnect(t *testing.T) {
 			args: args{
 				mg: &v1alpha1.Queue{
 					Spec: v1alpha1.QueueSpec{
-						ResourceSpec: xpv1.ResourceSpec{
-							ProviderConfigReference: &xpv1.Reference{
-								Name: "test",
+						ManagedResourceSpec: xpv2.ManagedResourceSpec{
+							ProviderConfigReference: &common.ProviderConfigReference{
+								Name: "testing-provider-config",
+								Kind: "ProviderConfig",
 							},
 						},
 					},

@@ -22,7 +22,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	xpv2 "github.com/crossplane/crossplane-runtime/v2/apis/common/v2"
 )
 
 // QueueParameters are the configurable fields of a Queue.
@@ -60,8 +61,8 @@ type QueueObservation struct {
 
 // A QueueSpec defines the desired state of a Queue.
 type QueueSpec struct {
-	xpv1.ResourceSpec `json:",inline"`
-	ForProvider       QueueParameters `json:"forProvider"`
+	xpv2.ManagedResourceSpec `json:",inline"`
+	ForProvider              QueueParameters `json:"forProvider"`
 }
 
 // A QueueStatus represents the observed state of a Queue.

@@ -17,7 +17,7 @@ limitations under the License.
 package controller
 
 import (
-	"github.com/crossplane/crossplane-runtime/pkg/controller"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/controller"
 	"github.com/pnowy/provider-rabbitmq/internal/controller/binding"
 	"github.com/pnowy/provider-rabbitmq/internal/controller/exchange"
 	"github.com/pnowy/provider-rabbitmq/internal/controller/permissions"
@@ -29,17 +29,17 @@ import (
 	"github.com/pnowy/provider-rabbitmq/internal/controller/vhost"
 )
 
-// Setup creates all RabbitMq controllers with the supplied logger and adds them to
+// SetupGated Setup creates all RabbitMq controllers with the supplied logger and adds them to
 // the supplied manager.
-func Setup(mgr ctrl.Manager, o controller.Options) error {
+func SetupGated(mgr ctrl.Manager, o controller.Options) error {
 	for _, setup := range []func(ctrl.Manager, controller.Options) error{
 		config.Setup,
-		vhost.Setup,
-		user.Setup,
-		exchange.Setup,
-		queue.Setup,
-		binding.Setup,
-		permissions.Setup,
+		vhost.SetupGated,
+		user.SetupGated,
+		exchange.SetupGated,
+		queue.SetupGated,
+		binding.SetupGated,
+		permissions.SetupGated,
 	} {
 		if err := setup(mgr, o); err != nil {
 			return err

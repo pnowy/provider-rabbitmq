@@ -2,6 +2,7 @@ apiVersion: core.rabbitmq.crossplane.io/v1alpha1
 kind: Binding
 metadata:
   name: my-binding
+  namespace: default
 spec:
   forProvider:
     vhost: demo
@@ -13,3 +14,4 @@ spec:
       region: europe
   providerConfigRef:
     name: provider-rabbitmq
+    kind: ClusterProviderConfig

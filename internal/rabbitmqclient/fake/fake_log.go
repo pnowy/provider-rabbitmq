@@ -1,7 +1,7 @@
 package fake
 
 import (
-	logging "github.com/crossplane/crossplane-runtime/pkg/logging"
+	logging "github.com/crossplane/crossplane-runtime/v2/pkg/logging"
 )
 
 type MockLog struct {
