@@ -14,43 +14,42 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package queue
+package vhost
 
 import (
 	"context"
 
-	"github.com/crossplane/crossplane-runtime/v2/pkg/feature"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/logging"
-	"github.com/crossplane/crossplane-runtime/v2/pkg/statemetrics"
-
-	"github.com/pnowy/provider-rabbitmq/internal/rabbitmqmeta"
+	"github.com/pnowy/provider-rabbitmq/apis/namespaced/core/v1alpha1"
+	apisv1alpha1 "github.com/pnowy/provider-rabbitmq/apis/namespaced/v1alpha1"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	rabbithole "github.com/michaelklishin/rabbit-hole/v3"
-	"github.com/pnowy/provider-rabbitmq/internal/rabbitmqclient"
-
 	"github.com/pkg/errors"
+	"github.com/pnowy/provider-rabbitmq/internal/rabbitmqmeta"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/crossplane/crossplane-runtime/v2/pkg/controller"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/event"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/feature"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/ratelimiter"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/statemetrics"
 
-	"github.com/pnowy/provider-rabbitmq/apis/core/v1alpha1"
-	apisv1alpha1 "github.com/pnowy/provider-rabbitmq/apis/v1alpha1"
+	"github.com/pnowy/provider-rabbitmq/internal/rabbitmqclient"
 )
 
 const (
-	errNotQueue     = "managed resource is not a Queue custom resource"
-	errGetFailed    = "cannot get RabbitMq queue"
-	errCreateFailed = "cannot create RabbitMq queue"
-	errDeleteFailed = "cannot delete RabbitMq queue"
-	errUpdateFailed = "cannot update RabbitMq queue"
+	errNotVhost     = "managed resource is not a Vhost custom resource"
+	errGetFailed    = "cannot get RabbitMq vhost"
+	errCreateFailed = "cannot create RabbitMq vhost"
+	errUpdateFailed = "cannot update RabbitMq vhost"
+	errDeleteFailed = "cannot delete RabbitMq vhost"
 	errTrackPCUsage = "cannot track ProviderConfig usage"
 	errGetPC        = "cannot get ProviderConfig"
 	errGetCPC       = "cannot get ClusterProviderConfig"
@@ -59,19 +58,19 @@ const (
 	errNewClient = "cannot create new Service"
 )
 
-// SetupGated adds a controller that reconciles Queue managed resources with safe-start support.
+// SetupGated adds a controller that reconciles MyType managed resources with safe-start support.
 func SetupGated(mgr ctrl.Manager, o controller.Options) error {
 	o.Gate.Register(func() {
 		if err := Setup(mgr, o); err != nil {
-			panic(errors.Wrap(err, "cannot setup Queue controller"))
+			panic(errors.Wrap(err, "cannot setup VHost controller"))
 		}
-	}, v1alpha1.QueueGroupVersionKind)
+	}, v1alpha1.VhostGroupVersionKind)
 	return nil
 }
 
-// Setup adds a controller that reconciles Queue managed resources.
+// Setup adds a controller that reconciles Vhost managed resources.
 func Setup(mgr ctrl.Manager, o controller.Options) error {
-	name := managed.ControllerName(v1alpha1.QueueGroupKind)
+	name := managed.ControllerName(v1alpha1.VhostGroupKind)
 	opts := []managed.ReconcilerOption{
 		managed.WithExternalConnector(&connector{
 			kube:         mgr.GetClient(),
@@ -97,20 +96,20 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 
 	if o.MetricOptions != nil && o.MetricOptions.MRStateMetrics != nil {
 		stateMetricsRecorder := statemetrics.NewMRStateRecorder(
-			mgr.GetClient(), o.Logger, o.MetricOptions.MRStateMetrics, &v1alpha1.QueueList{}, o.MetricOptions.PollStateMetricInterval,
+			mgr.GetClient(), o.Logger, o.MetricOptions.MRStateMetrics, &v1alpha1.VhostList{}, o.MetricOptions.PollStateMetricInterval,
 		)
 		if err := mgr.Add(stateMetricsRecorder); err != nil {
-			return errors.Wrap(err, "cannot register MR state metrics recorder for kind v1alpha1.Queue")
+			return errors.Wrap(err, "cannot register MR state metrics recorder for kind v1alpha1.MyTypeList")
 		}
 	}
 
-	r := managed.NewReconciler(mgr, resource.ManagedKind(v1alpha1.QueueGroupVersionKind), opts...)
+	r := managed.NewReconciler(mgr, resource.ManagedKind(v1alpha1.VhostGroupVersionKind), opts...)
 
 	return ctrl.NewControllerManagedBy(mgr).
 		Named(name).
 		WithOptions(o.ForControllerRuntime()).
 		WithEventFilter(resource.DesiredStateChanged()).
-		For(&v1alpha1.Queue{}).
+		For(&v1alpha1.Vhost{}).
 		Complete(ratelimiter.NewReconciler(name, r, o.GlobalRateLimiter))
 }
 
@@ -129,9 +128,9 @@ type connector struct {
 // 3. Getting the credentials specified by the ProviderConfig.
 // 4. Using the credentials to form a client.
 func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
-	cr, ok := mg.(*v1alpha1.Queue)
+	cr, ok := mg.(*v1alpha1.Vhost)
 	if !ok {
-		return nil, errors.New(errNotQueue)
+		return nil, errors.New(errNotVhost)
 	}
 
 	if err := c.usage.Track(ctx, cr); err != nil {
@@ -180,13 +179,12 @@ type external struct {
 }
 
 func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
-	cr, ok := mg.(*v1alpha1.Queue)
+	cr, ok := mg.(*v1alpha1.Vhost)
 	if !ok {
-		return managed.ExternalObservation{}, errors.New(errNotQueue)
+		return managed.ExternalObservation{}, errors.New(errNotVhost)
 	}
-
 	name := getExternalName(cr)
-	apiQueue, err := c.service.Rmqc.GetQueue(cr.Spec.ForProvider.Vhost, name)
+	rmqVhost, err := c.service.Rmqc.GetVhost(name)
 	if err != nil {
 		if rabbitmqclient.IsNotFoundError(err) {
 			return managed.ExternalObservation{
@@ -198,35 +196,33 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	if rabbitmqmeta.IsNotCrossplaneManaged(cr) {
 		return managed.ExternalObservation{}, rabbitmqmeta.NewNotCrossplaneManagedError(name)
 	}
+
 	current := cr.Spec.ForProvider.DeepCopy()
-	lateInitialize(&cr.Spec.ForProvider, apiQueue)
+	lateInitializeVhost(&cr.Spec.ForProvider, rmqVhost)
 	isResourceLateInitialized := !cmp.Equal(current, &cr.Spec.ForProvider)
 
-	cr.Status.AtProvider = generateQueueObservation(apiQueue)
+	cr.Status.AtProvider = generateVhostObservation(rmqVhost)
 	cr.Status.SetConditions(xpv1.Available())
 
-	isUptoDate := isUpToDate(&cr.Spec.ForProvider, apiQueue)
-
-	c.log.Info("Reconciling queue", "queue", name, "upToDate", isUptoDate, "lateInitialized", isResourceLateInitialized)
+	isUpToDate := isVhostUpToDate(&cr.Spec.ForProvider, rmqVhost)
+	c.log.Info("Reconciling vhost", "vhost", name, "upToDate", isUpToDate, "lateInitialized", isResourceLateInitialized)
 
 	return managed.ExternalObservation{
 		ResourceExists:          true,
-		ResourceUpToDate:        isUptoDate,
+		ResourceUpToDate:        isUpToDate,
 		ResourceLateInitialized: isResourceLateInitialized,
 	}, nil
 }
 
 func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {
-	cr, ok := mg.(*v1alpha1.Queue)
+	cr, ok := mg.(*v1alpha1.Vhost)
 	if !ok {
-		return managed.ExternalCreation{}, errors.New(errNotQueue)
+		return managed.ExternalCreation{}, errors.New(errNotVhost)
 	}
 
 	name := getExternalName(cr)
-	c.log.Info("Creating queue", "queue", name)
-
-	resp, err := c.service.Rmqc.DeclareQueue(cr.Spec.ForProvider.Vhost, name, generateQueueSettings(cr.Spec.ForProvider.QueueSettings))
-
+	c.log.Info("Creating vhost", "vhost", name)
+	resp, err := c.service.Rmqc.PutVhost(name, generateApiVhostSettings(cr.Spec.ForProvider.VhostSettings))
 	if err != nil {
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateFailed)
 	}
@@ -238,16 +234,14 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 }
 
 func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
-	cr, ok := mg.(*v1alpha1.Queue)
+	cr, ok := mg.(*v1alpha1.Vhost)
 	if !ok {
-		return managed.ExternalUpdate{}, errors.New(errNotQueue)
+		return managed.ExternalUpdate{}, errors.New(errNotVhost)
 	}
-
 	name := getExternalName(cr)
-	c.log.Info("Updating queue", "queue", name)
-
-	resp, err := c.service.Rmqc.DeclareQueue(cr.Spec.ForProvider.Vhost, name, generateQueueSettings(cr.Spec.ForProvider.QueueSettings))
-
+	c.log.Info("Updating vhost", "vhost", name)
+	options := generateApiVhostSettings(cr.Spec.ForProvider.VhostSettings)
+	resp, err := c.service.Rmqc.PutVhost(name, options)
 	if err != nil {
 		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdateFailed)
 	}
@@ -259,22 +253,20 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 }
 
 func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.ExternalDelete, error) {
-	cr, ok := mg.(*v1alpha1.Queue)
+	cr, ok := mg.(*v1alpha1.Vhost)
 	if !ok {
-		return managed.ExternalDelete{}, errors.New(errNotQueue)
+		return managed.ExternalDelete{}, errors.New(errNotVhost)
 	}
 
 	name := getExternalName(cr)
-	c.log.Info("Deleting queue", "queue", name)
-	resp, err := c.service.Rmqc.DeleteQueue(cr.Spec.ForProvider.Vhost, name)
-
+	c.log.Info("Deleting vhost", "vhost", name)
+	resp, err := c.service.Rmqc.DeleteVhost(name)
 	if err != nil {
 		return managed.ExternalDelete{}, errors.Wrap(err, errDeleteFailed)
 	}
 	if err := resp.Body.Close(); err != nil {
 		c.log.Debug("Error closing response body", "err", err)
 	}
-
 	return managed.ExternalDelete{}, nil
 }
 
@@ -282,85 +274,87 @@ func (c *external) Disconnect(ctx context.Context) error {
 	return nil
 }
 
-func getExternalName(spec *v1alpha1.Queue) string {
-	forProviderName := spec.Spec.ForProvider.Name
+func getExternalName(spec *v1alpha1.Vhost) string {
+	forProviderName := spec.Spec.ForProvider.HostName
 	if forProviderName != nil {
 		return *forProviderName
 	}
 	return spec.Name
 }
 
-func generateQueueSettings(spec *v1alpha1.QueueSettings) rabbithole.QueueSettings {
+// generateVhostObservation is used to produce v1alpha1.GroupGitLabObservation from gitlab.Group.
+func generateVhostObservation(vh *rabbithole.VhostInfo) v1alpha1.VhostObservation {
+	if vh == nil {
+		return v1alpha1.VhostObservation{}
+	}
+	vhost := v1alpha1.VhostObservation{
+		Name:                   vh.Name,
+		Description:            &vh.Description,
+		DefaultQueueType:       &vh.DefaultQueueType,
+		Messages:               vh.Messages,
+		MessagesReady:          vh.MessagesReady,
+		MessagesUnacknowledged: vh.MessagesUnacknowledged,
+	}
+	return vhost
+}
+
+func generateApiVhostSettings(spec *v1alpha1.VhostSettings) rabbithole.VhostSettings {
 	if spec == nil {
-		return rabbithole.QueueSettings{}
+		return rabbithole.VhostSettings{}
 	}
-	settings := rabbithole.QueueSettings{}
-	if spec.Type != nil {
-		settings.Type = *spec.Type
+	settings := rabbithole.VhostSettings{}
+	if spec.DefaultQueueType != nil {
+		settings.DefaultQueueType = *spec.DefaultQueueType
 	}
-	if spec.AutoDelete != nil {
-		settings.AutoDelete = *spec.AutoDelete
+	if spec.Description != nil {
+		settings.Description = *spec.Description
 	}
-	if spec.Durable != nil {
-		settings.Durable = *spec.Durable
+	if spec.Tracing != nil {
+		settings.Tracing = *spec.Tracing
 	}
-	if spec.Arguments != nil {
-		settings.Arguments = rabbitmqclient.ConvertStringMapToInterfaceMap(spec.Arguments)
+	if len(spec.Tags) > 0 {
+		settings.Tags = make([]string, len(spec.Tags))
+		copy(settings.Tags, spec.Tags)
 	}
 	return settings
 }
 
-func lateInitialize(spec *v1alpha1.QueueParameters, api *rabbithole.DetailedQueueInfo) {
+func lateInitializeVhost(spec *v1alpha1.VhostParameters, api *rabbithole.VhostInfo) {
 	if api == nil {
 		return
 	}
-	if spec.QueueSettings == nil {
-		spec.QueueSettings = &v1alpha1.QueueSettings{}
+	if spec.VhostSettings == nil {
+		spec.VhostSettings = &v1alpha1.VhostSettings{}
 	}
-	if spec.QueueSettings.Type == nil {
-		spec.QueueSettings.Type = &api.Type
+	if spec.VhostSettings.DefaultQueueType == nil {
+		spec.VhostSettings.DefaultQueueType = &api.DefaultQueueType
 	}
-	if spec.QueueSettings.AutoDelete == nil {
-		autoDelete := bool(api.AutoDelete)
-		spec.QueueSettings.AutoDelete = &autoDelete
+	if spec.VhostSettings.Description == nil {
+		spec.VhostSettings.Description = &api.Description
 	}
-	if spec.QueueSettings.Durable == nil {
-		spec.QueueSettings.Durable = &api.Durable
+	if spec.VhostSettings.Tracing == nil {
+		spec.VhostSettings.Tracing = &api.Tracing
 	}
-	if spec.QueueSettings.Arguments == nil {
-		spec.QueueSettings.Arguments = rabbitmqclient.ConvertInterfaceMapToStringMap(api.Arguments)
+	if len(api.Tags) > 0 && len(spec.VhostSettings.Tags) > 0 {
+		spec.VhostSettings.Tags = make([]string, len(api.Tags))
+		copy(spec.VhostSettings.Tags, api.Tags)
 	}
 }
 
-func generateQueueObservation(api *rabbithole.DetailedQueueInfo) v1alpha1.QueueObservation {
-	if api == nil {
-		return v1alpha1.QueueObservation{}
-	}
-	observation := v1alpha1.QueueObservation{
-		Name:       api.Name,
-		Vhost:      api.Vhost,
-		Type:       api.Type,
-		Durable:    api.Durable,
-		AutoDelete: bool(api.AutoDelete),
-		Arguments:  rabbitmqclient.ConvertInterfaceMapToStringMap(api.Arguments),
-	}
-
-	return observation
-}
-
-func isUpToDate(spec *v1alpha1.QueueParameters, api *rabbithole.DetailedQueueInfo) bool { //nolint:gocyclo
-	if spec.QueueSettings != nil {
-		if !rabbitmqclient.IsStringPtrEqualToString(spec.QueueSettings.Type, api.Type) {
+func isVhostUpToDate(spec *v1alpha1.VhostParameters, api *rabbithole.VhostInfo) bool { //nolint:gocyclo
+	if spec.VhostSettings != nil {
+		if !rabbitmqclient.IsStringPtrEqualToString(spec.VhostSettings.Description, api.Description) {
 			return false
 		}
-		if !rabbitmqclient.IsBoolPtrEqualToBool(spec.QueueSettings.Durable, api.Durable) {
+		if !rabbitmqclient.IsStringPtrEqualToString(spec.VhostSettings.DefaultQueueType, api.DefaultQueueType) {
 			return false
 		}
-		if !rabbitmqclient.IsBoolPtrEqualToBool(spec.QueueSettings.AutoDelete, bool(api.AutoDelete)) {
+		if !rabbitmqclient.IsBoolPtrEqualToBool(spec.VhostSettings.Tracing, api.Tracing) {
 			return false
 		}
-		argumentsUpToDate, _ := rabbitmqclient.MapsEqualJSON(spec.QueueSettings.Arguments, rabbitmqclient.ConvertInterfaceMapToStringMap(api.Arguments))
-		return argumentsUpToDate
+		if !cmp.Equal([]string(spec.VhostSettings.Tags), []string(api.Tags), cmpopts.EquateEmpty()) {
+			return false
+		}
 	}
 	return true
 }

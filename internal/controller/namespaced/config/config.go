@@ -22,9 +22,8 @@ import (
 	"github.com/crossplane/crossplane-runtime/v2/pkg/ratelimiter"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/providerconfig"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
+	v1alpha2 "github.com/pnowy/provider-rabbitmq/apis/namespaced/v1alpha1"
 	ctrl "sigs.k8s.io/controller-runtime"
-
-	"github.com/pnowy/provider-rabbitmq/apis/v1alpha1"
 )
 
 // Setup adds a controller that reconciles ProviderConfigs by accounting for
@@ -37,12 +36,12 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 }
 
 func setupNamespacedProviderConfig(mgr ctrl.Manager, o controller.Options) error {
-	name := providerconfig.ControllerName(v1alpha1.ProviderConfigGroupKind)
+	name := providerconfig.ControllerName(v1alpha2.ProviderConfigGroupKind)
 
 	of := resource.ProviderConfigKinds{
-		Config:    v1alpha1.ProviderConfigGroupVersionKind,
-		Usage:     v1alpha1.ProviderConfigUsageGroupVersionKind,
-		UsageList: v1alpha1.ProviderConfigUsageListGroupVersionKind,
+		Config:    v1alpha2.ProviderConfigGroupVersionKind,
+		Usage:     v1alpha2.ProviderConfigUsageGroupVersionKind,
+		UsageList: v1alpha2.ProviderConfigUsageListGroupVersionKind,
 	}
 
 	r := providerconfig.NewReconciler(mgr, of,
@@ -52,17 +51,17 @@ func setupNamespacedProviderConfig(mgr ctrl.Manager, o controller.Options) error
 	return ctrl.NewControllerManagedBy(mgr).
 		Named(name).
 		WithOptions(o.ForControllerRuntime()).
-		For(&v1alpha1.ProviderConfig{}).
-		Watches(&v1alpha1.ProviderConfigUsage{}, &resource.EnqueueRequestForProviderConfig{}).
+		For(&v1alpha2.ProviderConfig{}).
+		Watches(&v1alpha2.ProviderConfigUsage{}, &resource.EnqueueRequestForProviderConfig{}).
 		Complete(ratelimiter.NewReconciler(name, r, o.GlobalRateLimiter))
 }
 
 func setupClusterProviderConfig(mgr ctrl.Manager, o controller.Options) error {
-	name := providerconfig.ControllerName(v1alpha1.ClusterProviderConfigGroupKind)
+	name := providerconfig.ControllerName(v1alpha2.ClusterProviderConfigGroupKind)
 	of := resource.ProviderConfigKinds{
-		Config:    v1alpha1.ClusterProviderConfigGroupVersionKind,
-		Usage:     v1alpha1.ClusterProviderConfigUsageGroupVersionKind,
-		UsageList: v1alpha1.ClusterProviderConfigUsageListGroupVersionKind,
+		Config:    v1alpha2.ClusterProviderConfigGroupVersionKind,
+		Usage:     v1alpha2.ClusterProviderConfigUsageGroupVersionKind,
+		UsageList: v1alpha2.ClusterProviderConfigUsageListGroupVersionKind,
 	}
 
 	r := providerconfig.NewReconciler(mgr, of,
@@ -72,7 +71,7 @@ func setupClusterProviderConfig(mgr ctrl.Manager, o controller.Options) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		Named(name).
 		WithOptions(o.ForControllerRuntime()).
-		For(&v1alpha1.ClusterProviderConfig{}).
-		Watches(&v1alpha1.ClusterProviderConfigUsage{}, &resource.EnqueueRequestForProviderConfig{}).
+		For(&v1alpha2.ClusterProviderConfig{}).
+		Watches(&v1alpha2.ClusterProviderConfigUsage{}, &resource.EnqueueRequestForProviderConfig{}).
 		Complete(ratelimiter.NewReconciler(name, r, o.GlobalRateLimiter))
 }

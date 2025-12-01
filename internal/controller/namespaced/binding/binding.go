@@ -23,6 +23,8 @@ import (
 
 	"github.com/crossplane/crossplane-runtime/v2/pkg/feature"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/logging"
+	"github.com/pnowy/provider-rabbitmq/apis/namespaced/core/v1alpha1"
+	apisv1alpha1 "github.com/pnowy/provider-rabbitmq/apis/namespaced/v1alpha1"
 
 	"github.com/pnowy/provider-rabbitmq/internal/rabbitmqmeta"
 
@@ -36,8 +38,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	rabbithole "github.com/michaelklishin/rabbit-hole/v3"
 	"github.com/pkg/errors"
-	"github.com/pnowy/provider-rabbitmq/apis/core/v1alpha1"
-	apisv1alpha1 "github.com/pnowy/provider-rabbitmq/apis/v1alpha1"
 	"github.com/pnowy/provider-rabbitmq/internal/rabbitmqclient"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"

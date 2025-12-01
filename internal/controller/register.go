@@ -18,15 +18,14 @@ package controller
 
 import (
 	"github.com/crossplane/crossplane-runtime/v2/pkg/controller"
-	"github.com/pnowy/provider-rabbitmq/internal/controller/binding"
-	"github.com/pnowy/provider-rabbitmq/internal/controller/exchange"
-	"github.com/pnowy/provider-rabbitmq/internal/controller/permissions"
-	"github.com/pnowy/provider-rabbitmq/internal/controller/queue"
+	"github.com/pnowy/provider-rabbitmq/internal/controller/namespaced/binding"
+	"github.com/pnowy/provider-rabbitmq/internal/controller/namespaced/config"
+	"github.com/pnowy/provider-rabbitmq/internal/controller/namespaced/exchange"
+	"github.com/pnowy/provider-rabbitmq/internal/controller/namespaced/permissions"
+	"github.com/pnowy/provider-rabbitmq/internal/controller/namespaced/queue"
+	"github.com/pnowy/provider-rabbitmq/internal/controller/namespaced/user"
+	"github.com/pnowy/provider-rabbitmq/internal/controller/namespaced/vhost"
 	ctrl "sigs.k8s.io/controller-runtime"
-
-	"github.com/pnowy/provider-rabbitmq/internal/controller/config"
-	"github.com/pnowy/provider-rabbitmq/internal/controller/user"
-	"github.com/pnowy/provider-rabbitmq/internal/controller/vhost"
 )
 
 // SetupGated Setup creates all RabbitMq controllers with the supplied logger and adds them to

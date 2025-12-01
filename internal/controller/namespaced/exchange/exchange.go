@@ -14,63 +14,61 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package vhost
+package exchange
 
 import (
 	"context"
 
-	"github.com/crossplane/crossplane-runtime/v2/pkg/logging"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/feature"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/statemetrics"
+	"github.com/pnowy/provider-rabbitmq/apis/namespaced/core/v1alpha1"
+	apisv1alpha1 "github.com/pnowy/provider-rabbitmq/apis/namespaced/v1alpha1"
+	"github.com/pnowy/provider-rabbitmq/internal/rabbitmqmeta"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
 	rabbithole "github.com/michaelklishin/rabbit-hole/v3"
 	"github.com/pkg/errors"
-	"github.com/pnowy/provider-rabbitmq/internal/rabbitmqmeta"
+	"github.com/pnowy/provider-rabbitmq/internal/rabbitmqclient"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/crossplane/crossplane-runtime/v2/pkg/controller"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/event"
-	"github.com/crossplane/crossplane-runtime/v2/pkg/feature"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/logging"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/ratelimiter"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
-	"github.com/crossplane/crossplane-runtime/v2/pkg/statemetrics"
-
-	"github.com/pnowy/provider-rabbitmq/apis/core/v1alpha1"
-	apisv1alpha1 "github.com/pnowy/provider-rabbitmq/apis/v1alpha1"
-	"github.com/pnowy/provider-rabbitmq/internal/rabbitmqclient"
 )
 
 const (
-	errNotVhost     = "managed resource is not a Vhost custom resource"
-	errGetFailed    = "cannot get RabbitMq vhost"
-	errCreateFailed = "cannot create RabbitMq vhost"
-	errUpdateFailed = "cannot update RabbitMq vhost"
-	errDeleteFailed = "cannot delete RabbitMq vhost"
-	errTrackPCUsage = "cannot track ProviderConfig usage"
-	errGetPC        = "cannot get ProviderConfig"
-	errGetCPC       = "cannot get ClusterProviderConfig"
-	errGetCreds     = "cannot get credentials"
-
-	errNewClient = "cannot create new Service"
+	errNotExchange      = "managed resource is not a Exchange custom resource"
+	errTrackPCUsage     = "cannot track ProviderConfig usage"
+	errGetPC            = "cannot get ProviderConfig"
+	errGetCPC           = "cannot get ClusterProviderConfig"
+	errGetCreds         = "cannot get credentials"
+	errGetFailed        = "cannot get RabbitMq Exchange"
+	errNewClient        = "cannot create new Service"
+	errCreateFailed     = "cannot create new Exchange"
+	errDeleteFailed     = "cannot delete Exchange"
+	errUpdateFailed     = "cannot update Exchange"
+	exchangeDefaultType = "fanout"
 )
 
 // SetupGated adds a controller that reconciles MyType managed resources with safe-start support.
 func SetupGated(mgr ctrl.Manager, o controller.Options) error {
 	o.Gate.Register(func() {
 		if err := Setup(mgr, o); err != nil {
-			panic(errors.Wrap(err, "cannot setup VHost controller"))
+			panic(errors.Wrap(err, "cannot setup Exchange controller"))
 		}
-	}, v1alpha1.VhostGroupVersionKind)
+	}, v1alpha1.ExchangeGroupVersionKind)
 	return nil
 }
 
-// Setup adds a controller that reconciles Vhost managed resources.
+// Setup adds a controller that reconciles Exchange managed resources.
 func Setup(mgr ctrl.Manager, o controller.Options) error {
-	name := managed.ControllerName(v1alpha1.VhostGroupKind)
+	name := managed.ControllerName(v1alpha1.ExchangeGroupKind)
 	opts := []managed.ReconcilerOption{
 		managed.WithExternalConnector(&connector{
 			kube:         mgr.GetClient(),
@@ -96,20 +94,20 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 
 	if o.MetricOptions != nil && o.MetricOptions.MRStateMetrics != nil {
 		stateMetricsRecorder := statemetrics.NewMRStateRecorder(
-			mgr.GetClient(), o.Logger, o.MetricOptions.MRStateMetrics, &v1alpha1.VhostList{}, o.MetricOptions.PollStateMetricInterval,
+			mgr.GetClient(), o.Logger, o.MetricOptions.MRStateMetrics, &v1alpha1.ExchangeList{}, o.MetricOptions.PollStateMetricInterval,
 		)
 		if err := mgr.Add(stateMetricsRecorder); err != nil {
-			return errors.Wrap(err, "cannot register MR state metrics recorder for kind v1alpha1.MyTypeList")
+			return errors.Wrap(err, "cannot register MR state metrics recorder for kind v1alpha1.ExchangeList")
 		}
 	}
 
-	r := managed.NewReconciler(mgr, resource.ManagedKind(v1alpha1.VhostGroupVersionKind), opts...)
+	r := managed.NewReconciler(mgr, resource.ManagedKind(v1alpha1.ExchangeGroupVersionKind), opts...)
 
 	return ctrl.NewControllerManagedBy(mgr).
 		Named(name).
 		WithOptions(o.ForControllerRuntime()).
 		WithEventFilter(resource.DesiredStateChanged()).
-		For(&v1alpha1.Vhost{}).
+		For(&v1alpha1.Exchange{}).
 		Complete(ratelimiter.NewReconciler(name, r, o.GlobalRateLimiter))
 }
 
@@ -128,9 +126,9 @@ type connector struct {
 // 3. Getting the credentials specified by the ProviderConfig.
 // 4. Using the credentials to form a client.
 func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
-	cr, ok := mg.(*v1alpha1.Vhost)
+	cr, ok := mg.(*v1alpha1.Exchange)
 	if !ok {
-		return nil, errors.New(errNotVhost)
+		return nil, errors.New(errNotExchange)
 	}
 
 	if err := c.usage.Track(ctx, cr); err != nil {
@@ -173,18 +171,24 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 	return &external{service: svc, log: c.logger}, nil
 }
 
+// An ExternalClient observes, then either creates, updates, or deletes an
+// external resource to ensure it reflects the managed resource's desired state.
 type external struct {
 	service *rabbitmqclient.RabbitMqService
 	log     logging.Logger
 }
 
 func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
-	cr, ok := mg.(*v1alpha1.Vhost)
+	cr, ok := mg.(*v1alpha1.Exchange)
 	if !ok {
-		return managed.ExternalObservation{}, errors.New(errNotVhost)
+		return managed.ExternalObservation{}, errors.New(errNotExchange)
 	}
+
 	name := getExternalName(cr)
-	rmqVhost, err := c.service.Rmqc.GetVhost(name)
+	c.log.Info("Observing exchange", "exchange", name)
+
+	apiExchange, err := c.service.Rmqc.GetExchange(cr.Spec.ForProvider.Vhost, name)
+
 	if err != nil {
 		if rabbitmqclient.IsNotFoundError(err) {
 			return managed.ExternalObservation{
@@ -196,76 +200,87 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	if rabbitmqmeta.IsNotCrossplaneManaged(cr) {
 		return managed.ExternalObservation{}, rabbitmqmeta.NewNotCrossplaneManagedError(name)
 	}
-
 	current := cr.Spec.ForProvider.DeepCopy()
-	lateInitializeVhost(&cr.Spec.ForProvider, rmqVhost)
+	lateInitialize(&cr.Spec.ForProvider, apiExchange)
 	isResourceLateInitialized := !cmp.Equal(current, &cr.Spec.ForProvider)
-
-	cr.Status.AtProvider = generateVhostObservation(rmqVhost)
+	cr.Status.AtProvider = generateExchangeObservation(apiExchange)
 	cr.Status.SetConditions(xpv1.Available())
 
-	isUpToDate := isVhostUpToDate(&cr.Spec.ForProvider, rmqVhost)
-	c.log.Info("Reconciling vhost", "vhost", name, "upToDate", isUpToDate, "lateInitialized", isResourceLateInitialized)
+	isExchangeUptoDate := isUpToDate(&cr.Spec.ForProvider, apiExchange)
+
+	c.log.Debug("Reconciling exchange", "exchange", name, "current", current, "isUpToDate", isExchangeUptoDate)
 
 	return managed.ExternalObservation{
 		ResourceExists:          true,
-		ResourceUpToDate:        isUpToDate,
+		ResourceUpToDate:        isExchangeUptoDate,
 		ResourceLateInitialized: isResourceLateInitialized,
+		ConnectionDetails:       managed.ConnectionDetails{},
 	}, nil
 }
 
 func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {
-	cr, ok := mg.(*v1alpha1.Vhost)
+	cr, ok := mg.(*v1alpha1.Exchange)
 	if !ok {
-		return managed.ExternalCreation{}, errors.New(errNotVhost)
+		return managed.ExternalCreation{}, errors.New(errNotExchange)
 	}
-
 	name := getExternalName(cr)
-	c.log.Info("Creating vhost", "vhost", name)
-	resp, err := c.service.Rmqc.PutVhost(name, generateApiVhostSettings(cr.Spec.ForProvider.VhostSettings))
+	c.log.Info("Creating exchange", "exchange", name)
+
+	resp, err := c.service.Rmqc.DeclareExchange(cr.Spec.ForProvider.Vhost, name, generateExchangeSettings(cr.Spec.ForProvider.ExchangeSettings))
+
 	if err != nil {
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateFailed)
 	}
 	if err := resp.Body.Close(); err != nil {
-		c.log.Debug("Error closing response body", "err", err)
+		c.log.Debug(err.Error(), "failed to close response body")
 	}
+
 	rabbitmqmeta.SetCrossplaneManaged(cr, name)
-	return managed.ExternalCreation{}, nil
+	return managed.ExternalCreation{
+		ConnectionDetails: managed.ConnectionDetails{},
+	}, nil
 }
 
 func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
-	cr, ok := mg.(*v1alpha1.Vhost)
+	cr, ok := mg.(*v1alpha1.Exchange)
 	if !ok {
-		return managed.ExternalUpdate{}, errors.New(errNotVhost)
+		return managed.ExternalUpdate{}, errors.New(errNotExchange)
 	}
+
 	name := getExternalName(cr)
-	c.log.Info("Updating vhost", "vhost", name)
-	options := generateApiVhostSettings(cr.Spec.ForProvider.VhostSettings)
-	resp, err := c.service.Rmqc.PutVhost(name, options)
+	c.log.Info("Updating exchange", "exchange", name)
+
+	resp, err := c.service.Rmqc.DeclareExchange(cr.Spec.ForProvider.Vhost, name, generateExchangeSettings(cr.Spec.ForProvider.ExchangeSettings))
+
 	if err != nil {
 		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdateFailed)
 	}
 	if err := resp.Body.Close(); err != nil {
-		c.log.Debug("Error closing response body", "err", err)
+		c.log.Debug(err.Error(), "failed to close response body")
 	}
 
-	return managed.ExternalUpdate{}, nil
+	return managed.ExternalUpdate{
+		ConnectionDetails: managed.ConnectionDetails{},
+	}, nil
 }
 
 func (c *external) Delete(ctx context.Context, mg resource.Managed) (managed.ExternalDelete, error) {
-	cr, ok := mg.(*v1alpha1.Vhost)
+	cr, ok := mg.(*v1alpha1.Exchange)
 	if !ok {
-		return managed.ExternalDelete{}, errors.New(errNotVhost)
+		return managed.ExternalDelete{}, errors.New(errNotExchange)
 	}
 
 	name := getExternalName(cr)
-	c.log.Info("Deleting vhost", "vhost", name)
-	resp, err := c.service.Rmqc.DeleteVhost(name)
+	c.log.Info("Deleting exchange", "exchange", name)
+
+	resp, err := c.service.Rmqc.DeleteExchange(cr.Spec.ForProvider.Vhost, name)
+
 	if err != nil {
+		c.log.Debug(err.Error(), "failed to delete exchange", "exchange", name)
 		return managed.ExternalDelete{}, errors.Wrap(err, errDeleteFailed)
 	}
 	if err := resp.Body.Close(); err != nil {
-		c.log.Debug("Error closing response body", "err", err)
+		c.log.Debug(err.Error(), "failed to close response body")
 	}
 	return managed.ExternalDelete{}, nil
 }
@@ -274,87 +289,77 @@ func (c *external) Disconnect(ctx context.Context) error {
 	return nil
 }
 
-func getExternalName(spec *v1alpha1.Vhost) string {
-	forProviderName := spec.Spec.ForProvider.HostName
+func getExternalName(spec *v1alpha1.Exchange) string {
+	forProviderName := spec.Spec.ForProvider.Name
 	if forProviderName != nil {
 		return *forProviderName
 	}
 	return spec.Name
 }
 
-// generateVhostObservation is used to produce v1alpha1.GroupGitLabObservation from gitlab.Group.
-func generateVhostObservation(vh *rabbithole.VhostInfo) v1alpha1.VhostObservation {
-	if vh == nil {
-		return v1alpha1.VhostObservation{}
+func lateInitialize(spec *v1alpha1.ExchangeParameters, api *rabbithole.DetailedExchangeInfo) {
+	if api == nil {
+		return
 	}
-	vhost := v1alpha1.VhostObservation{
-		Name:                   vh.Name,
-		Description:            &vh.Description,
-		DefaultQueueType:       &vh.DefaultQueueType,
-		Messages:               vh.Messages,
-		MessagesReady:          vh.MessagesReady,
-		MessagesUnacknowledged: vh.MessagesUnacknowledged,
+	if spec.ExchangeSettings == nil {
+		spec.ExchangeSettings = &v1alpha1.ExchangeSettings{}
 	}
-	return vhost
 }
 
-func generateApiVhostSettings(spec *v1alpha1.VhostSettings) rabbithole.VhostSettings {
+func generateExchangeSettings(spec *v1alpha1.ExchangeSettings) rabbithole.ExchangeSettings {
 	if spec == nil {
-		return rabbithole.VhostSettings{}
+		settings := rabbithole.ExchangeSettings{}
+		// Default value (Type is required in rabbitMq api)
+		settings.Type = exchangeDefaultType
+		return settings
 	}
-	settings := rabbithole.VhostSettings{}
-	if spec.DefaultQueueType != nil {
-		settings.DefaultQueueType = *spec.DefaultQueueType
+	settings := rabbithole.ExchangeSettings{}
+	if spec.Type != nil {
+		settings.Type = *spec.Type
+	} else {
+		// Default value (Type is required in rabbitMq api)
+		settings.Type = exchangeDefaultType
 	}
-	if spec.Description != nil {
-		settings.Description = *spec.Description
+	if spec.Durable != nil {
+		settings.Durable = *spec.Durable
 	}
-	if spec.Tracing != nil {
-		settings.Tracing = *spec.Tracing
+	if spec.AutoDelete != nil {
+		settings.AutoDelete = *spec.AutoDelete
 	}
-	if len(spec.Tags) > 0 {
-		settings.Tags = make([]string, len(spec.Tags))
-		copy(settings.Tags, spec.Tags)
+	if spec.Arguments != nil {
+		settings.Arguments = rabbitmqclient.ConvertStringMapToInterfaceMap(spec.Arguments)
 	}
 	return settings
 }
 
-func lateInitializeVhost(spec *v1alpha1.VhostParameters, api *rabbithole.VhostInfo) {
+func generateExchangeObservation(api *rabbithole.DetailedExchangeInfo) v1alpha1.ExchangeObservation {
 	if api == nil {
-		return
+		return v1alpha1.ExchangeObservation{}
 	}
-	if spec.VhostSettings == nil {
-		spec.VhostSettings = &v1alpha1.VhostSettings{}
+	exchange := v1alpha1.ExchangeObservation{
+		Name:       api.Name,
+		Vhost:      api.Vhost,
+		Type:       api.Type,
+		Durable:    api.Durable,
+		AutoDelete: api.AutoDelete,
+		Arguments:  rabbitmqclient.ConvertInterfaceMapToStringMap(api.Arguments),
 	}
-	if spec.VhostSettings.DefaultQueueType == nil {
-		spec.VhostSettings.DefaultQueueType = &api.DefaultQueueType
-	}
-	if spec.VhostSettings.Description == nil {
-		spec.VhostSettings.Description = &api.Description
-	}
-	if spec.VhostSettings.Tracing == nil {
-		spec.VhostSettings.Tracing = &api.Tracing
-	}
-	if len(api.Tags) > 0 && len(spec.VhostSettings.Tags) > 0 {
-		spec.VhostSettings.Tags = make([]string, len(api.Tags))
-		copy(spec.VhostSettings.Tags, api.Tags)
-	}
+	return exchange
 }
 
-func isVhostUpToDate(spec *v1alpha1.VhostParameters, api *rabbithole.VhostInfo) bool { //nolint:gocyclo
-	if spec.VhostSettings != nil {
-		if !rabbitmqclient.IsStringPtrEqualToString(spec.VhostSettings.Description, api.Description) {
+func isUpToDate(spec *v1alpha1.ExchangeParameters, api *rabbithole.DetailedExchangeInfo) bool { //nolint:gocyclo
+	if spec.ExchangeSettings != nil {
+		if !rabbitmqclient.IsStringPtrEqualToString(spec.ExchangeSettings.Type, api.Type) {
 			return false
 		}
-		if !rabbitmqclient.IsStringPtrEqualToString(spec.VhostSettings.DefaultQueueType, api.DefaultQueueType) {
+		if !rabbitmqclient.IsBoolPtrEqualToBool(spec.ExchangeSettings.Durable, api.Durable) {
 			return false
 		}
-		if !rabbitmqclient.IsBoolPtrEqualToBool(spec.VhostSettings.Tracing, api.Tracing) {
+		if !rabbitmqclient.IsBoolPtrEqualToBool(spec.ExchangeSettings.AutoDelete, api.AutoDelete) {
 			return false
 		}
-		if !cmp.Equal([]string(spec.VhostSettings.Tags), []string(api.Tags), cmpopts.EquateEmpty()) {
-			return false
-		}
+		argumentsUpToDate, _ := rabbitmqclient.MapsEqualJSON(spec.ExchangeSettings.Arguments, rabbitmqclient.ConvertInterfaceMapToStringMap(api.Arguments))
+		return argumentsUpToDate
 	}
 	return true
 }

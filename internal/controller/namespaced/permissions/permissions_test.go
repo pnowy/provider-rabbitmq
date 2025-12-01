@@ -23,6 +23,8 @@ import (
 
 	"github.com/crossplane/crossplane-runtime/v2/apis/common"
 	xpv2 "github.com/crossplane/crossplane-runtime/v2/apis/common/v2"
+	"github.com/pnowy/provider-rabbitmq/apis/namespaced/core/v1alpha1"
+	apisv1alpha1 "github.com/pnowy/provider-rabbitmq/apis/namespaced/v1alpha1"
 	"github.com/pnowy/provider-rabbitmq/internal/rabbitmqmeta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -38,8 +40,6 @@ import (
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
 	"github.com/google/go-cmp/cmp"
-	"github.com/pnowy/provider-rabbitmq/apis/core/v1alpha1"
-	apisv1alpha1 "github.com/pnowy/provider-rabbitmq/apis/v1alpha1"
 	"github.com/pnowy/provider-rabbitmq/internal/rabbitmqclient"
 	"github.com/pnowy/provider-rabbitmq/internal/rabbitmqclient/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client"

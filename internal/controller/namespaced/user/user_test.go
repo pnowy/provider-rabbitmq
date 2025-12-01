@@ -22,10 +22,8 @@ import (
 	"testing"
 
 	"github.com/crossplane/crossplane-runtime/v2/apis/common"
-	xpv2 "github.com/crossplane/crossplane-runtime/v2/apis/common/v2"
-	apisv1alpha1 "github.com/pnowy/provider-rabbitmq/apis/v1alpha1"
-
 	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	xpv2 "github.com/crossplane/crossplane-runtime/v2/apis/common/v2"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/logging"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
@@ -33,11 +31,12 @@ import (
 	"github.com/google/go-cmp/cmp"
 	rabbithole "github.com/michaelklishin/rabbit-hole/v3"
 	"github.com/pkg/errors"
+	"github.com/pnowy/provider-rabbitmq/apis/namespaced/core/v1alpha1"
+	apisv1alpha1 "github.com/pnowy/provider-rabbitmq/apis/namespaced/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/pnowy/provider-rabbitmq/apis/core/v1alpha1"
 	"github.com/pnowy/provider-rabbitmq/internal/rabbitmqclient"
 	"github.com/pnowy/provider-rabbitmq/internal/rabbitmqclient/fake"
 	"github.com/pnowy/provider-rabbitmq/internal/rabbitmqmeta"
