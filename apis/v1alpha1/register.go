@@ -9,7 +9,7 @@ import (
 
 // Package type metadata.
 const (
-	Group   = "rabbitmq.crossplane.io"
+	Group   = "rabbitmq.m.crossplane.io"
 	Version = "v1alpha1"
 )
 

@@ -4,18 +4,18 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.19.0
-  name: queues.core.rabbitmq.crossplane.io
+  name: vhosts.rabbitmq.m.crossplane.io
 spec:
-  group: core.rabbitmq.crossplane.io
+  group: rabbitmq.m.crossplane.io
   names:
     categories:
     - crossplane
     - managed
     - rabbitmq
-    kind: Queue
-    listKind: QueueList
-    plural: queues
-    singular: queue
+    kind: Vhost
+    listKind: VhostList
+    plural: vhosts
+    singular: vhost
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
@@ -34,7 +34,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: Queue - manage queues
+        description: Vhost - manage vhosts
         properties:
           apiVersion:
             description: |-
@@ -54,46 +54,35 @@ spec:
           metadata:
             type: object
           spec:
-            description: A QueueSpec defines the desired state of a Queue.
+            description: A VhostSpec defines the desired state of a Vhost.
             properties:
               forProvider:
-                description: QueueParameters are the configurable fields of a Queue.
+                description: VhostParameters are the configurable fields of a Vhost
                 properties:
-                  name:
+                  hostName:
                     type: string
-                  queueSettings:
-                    description: QueueSettings
+                  vhostSettings:
                     properties:
-                      arguments:
-                        additionalProperties:
-                          type: string
-                        type: object
-                      autoDelete:
-                        type: boolean
-                      durable:
-                        type: boolean
-                      type:
+                      defaultQueueType:
+                        description: Type of queue to create in virtual host when
+                          unspecified in queue level
                         type: string
+                      description:
+                        description: Virtual host description
+                        type: string
+                      tags:
+                        description: Virtual host tags
+                        items:
+                          type: string
+                        type: array
+                      tracing:
+                        description: True if tracing should be enabled
+                        type: boolean
                     type: object
-                    x-kubernetes-validations:
-                    - message: Type is immutable once set
-                      rule: '!has(oldSelf.type) || self.type == oldSelf.type'
-                    - message: Durable is immutable once set
-                      rule: '!has(oldSelf.durable) || self.durable == oldSelf.durable'
-                    - message: AutoDelete is immutable once set
-                      rule: '!has(oldSelf.autoDelete) || self.autoDelete == oldSelf.autoDelete'
-                    - message: Arguments are immutable once set
-                      rule: '!has(oldSelf.arguments) || self.arguments == oldSelf.arguments'
-                  vhost:
-                    type: string
-                required:
-                - vhost
                 type: object
                 x-kubernetes-validations:
-                - message: Name is immutable once set
-                  rule: '!has(oldSelf.name) || self.name == oldSelf.name'
-                - message: Vhost is immutable once set
-                  rule: '!has(oldSelf.vhost) || self.vhost == oldSelf.vhost'
+                - message: HostName is immutable once set
+                  rule: '!has(oldSelf.hostName) || self.hostName == oldSelf.hostName'
               managementPolicies:
                 default:
                 - '*'
@@ -153,27 +142,28 @@ spec:
             - forProvider
             type: object
           status:
-            description: A QueueStatus represents the observed state of a Queue.
+            description: A VhostStatus represents the observed state of a Vhost.
             properties:
               atProvider:
-                description: QueueObservation are the observable fields of a Queue.
+                description: VhostObservation are the observable fields of a Vhost.
                 properties:
-                  arguments:
-                    additionalProperties:
-                      type: string
-                    type: object
-                  autoDelete:
-                    type: boolean
-                  durable:
-                    type: boolean
+                  defaultQueueType:
+                    type: string
+                  description:
+                    type: string
+                  messages:
+                    type: integer
+                  messagesReady:
+                    type: integer
+                  messagesUnacknowledged:
+                    type: integer
                   name:
                     type: string
-                  type:
-                    type: string
-                  vhost:
-                    type: string
                 required:
-                - vhost
+                - messages
+                - messagesReady
+                - messagesUnacknowledged
+                - name
                 type: object
               conditions:
                 description: Conditions of the resource.

@@ -4,9 +4,9 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.19.0
-  name: providerconfigusages.rabbitmq.crossplane.io
+  name: providerconfigusages.rabbitmq.m.crossplane.io
 spec:
-  group: rabbitmq.crossplane.io
+  group: rabbitmq.m.crossplane.io
   names:
     categories:
     - crossplane

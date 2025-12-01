@@ -4,18 +4,18 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.19.0
-  name: vhosts.core.rabbitmq.crossplane.io
+  name: permissions.rabbitmq.m.crossplane.io
 spec:
-  group: core.rabbitmq.crossplane.io
+  group: rabbitmq.m.crossplane.io
   names:
     categories:
     - crossplane
     - managed
     - rabbitmq
-    kind: Vhost
-    listKind: VhostList
-    plural: vhosts
-    singular: vhost
+    kind: Permissions
+    listKind: PermissionsList
+    plural: permissions
+    singular: permissions
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
@@ -34,7 +34,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: Vhost - manage vhosts
+        description: Permissions - manage user permissions within virtual hosts
         properties:
           apiVersion:
             description: |-
@@ -54,35 +54,39 @@ spec:
           metadata:
             type: object
           spec:
-            description: A VhostSpec defines the desired state of a Vhost.
+            description: A PermissionsSpec defines the desired state of a Permissions.
             properties:
               forProvider:
-                description: VhostParameters are the configurable fields of a Vhost
+                description: PermissionsParameters are the configurable fields of
+                  a Permissions.
                 properties:
-                  hostName:
-                    type: string
-                  vhostSettings:
+                  permissions:
                     properties:
-                      defaultQueueType:
-                        description: Type of queue to create in virtual host when
-                          unspecified in queue level
+                      configure:
                         type: string
-                      description:
-                        description: Virtual host description
+                      read:
                         type: string
-                      tags:
-                        description: Virtual host tags
-                        items:
-                          type: string
-                        type: array
-                      tracing:
-                        description: True if tracing should be enabled
-                        type: boolean
+                      write:
+                        type: string
+                    required:
+                    - configure
+                    - read
+                    - write
                     type: object
+                  user:
+                    type: string
+                  vhost:
+                    type: string
+                required:
+                - permissions
+                - user
+                - vhost
                 type: object
                 x-kubernetes-validations:
-                - message: HostName is immutable once set
-                  rule: '!has(oldSelf.hostName) || self.hostName == oldSelf.hostName'
+                - message: User is immutable once set
+                  rule: '!has(oldSelf.user) || self.user == oldSelf.user'
+                - message: Vhost is immutable once set
+                  rule: '!has(oldSelf.vhost) || self.vhost == oldSelf.vhost'
               managementPolicies:
                 default:
                 - '*'
@@ -142,28 +146,28 @@ spec:
             - forProvider
             type: object
           status:
-            description: A VhostStatus represents the observed state of a Vhost.
+            description: A PermissionsStatus represents the observed state of a Permissions.
             properties:
               atProvider:
-                description: VhostObservation are the observable fields of a Vhost.
+                description: PermissionsObservation are the observable fields of a
+                  Permissions.
                 properties:
-                  defaultQueueType:
+                  configure:
                     type: string
-                  description:
+                  read:
                     type: string
-                  messages:
-                    type: integer
-                  messagesReady:
-                    type: integer
-                  messagesUnacknowledged:
-                    type: integer
-                  name:
+                  user:
+                    type: string
+                  vhost:
+                    type: string
+                  write:
                     type: string
                 required:
-                - messages
-                - messagesReady
-                - messagesUnacknowledged
-                - name
+                - configure
+                - read
+                - user
+                - vhost
+                - write
                 type: object
               conditions:
                 description: Conditions of the resource.

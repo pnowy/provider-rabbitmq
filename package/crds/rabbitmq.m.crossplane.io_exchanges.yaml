@@ -4,18 +4,18 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.19.0
-  name: bindings.core.rabbitmq.crossplane.io
+  name: exchanges.rabbitmq.m.crossplane.io
 spec:
-  group: core.rabbitmq.crossplane.io
+  group: rabbitmq.m.crossplane.io
   names:
     categories:
     - crossplane
     - managed
     - rabbitmq
-    kind: Binding
-    listKind: BindingList
-    plural: bindings
-    singular: binding
+    kind: Exchange
+    listKind: ExchangeList
+    plural: exchanges
+    singular: exchange
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
@@ -34,7 +34,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: Binding - configure bindings between exchanges and queues
+        description: Exchange - manage exchanges
         properties:
           apiVersion:
             description: |-
@@ -54,46 +54,46 @@ spec:
           metadata:
             type: object
           spec:
-            description: A BindingSpec defines the desired state of a Binding.
+            description: A ExchangeSpec defines the desired state of a Exchange.
             properties:
               forProvider:
-                description: BindingParameters are the configurable fields of a Binding.
+                description: ExchangeParameters are the configurable fields of a Exchange.
                 properties:
-                  arguments:
-                    additionalProperties:
-                      type: string
+                  exchangeSettings:
+                    description: ExchangeSettings
+                    properties:
+                      arguments:
+                        additionalProperties:
+                          type: string
+                        type: object
+                      autoDelete:
+                        type: boolean
+                      durable:
+                        type: boolean
+                      type:
+                        type: string
                     type: object
-                  destination:
-                    type: string
-                  destinationType:
-                    type: string
-                  routingKey:
-                    type: string
-                  source:
+                    x-kubernetes-validations:
+                    - message: Type is immutable once set
+                      rule: '!has(oldSelf.type) || self.type == oldSelf.type'
+                    - message: Durable is immutable once set
+                      rule: '!has(oldSelf.durable) || self.durable == oldSelf.durable'
+                    - message: AutoDelete is immutable once set
+                      rule: '!has(oldSelf.autoDelete) || self.autoDelete == oldSelf.autoDelete'
+                    - message: Arguments are immutable once set
+                      rule: '!has(oldSelf.arguments) || self.arguments == oldSelf.arguments'
+                  name:
                     type: string
                   vhost:
                     type: string
                 required:
-                - destination
-                - destinationType
-                - routingKey
-                - source
                 - vhost
                 type: object
                 x-kubernetes-validations:
-                - message: Destination is immutable once set
-                  rule: '!has(oldSelf.destination) || self.destination == oldSelf.destination'
-                - message: Vhost is immutable once set
+                - message: Name is immutable once set
+                  rule: '!has(oldSelf.name) || self.name == oldSelf.name'
+                - message: Vhost is immutable once
                   rule: '!has(oldSelf.vhost) || self.vhost == oldSelf.vhost'
-                - message: Destination Type is immutable once set
-                  rule: '!has(oldSelf.destinationType) || self.destinationType ==
-                    oldSelf.destinationType'
-                - message: Source is immutable once set
-                  rule: '!has(oldSelf.source) || self.source == oldSelf.source'
-                - message: Routing Key is immutable once set
-                  rule: '!has(oldSelf.routingKey) || self.routingKey == oldSelf.routingKey'
-                - message: Arguments are immutable once set
-                  rule: '!has(oldSelf.arguments) || self.arguments == oldSelf.arguments'
               managementPolicies:
                 default:
                 - '*'
@@ -153,35 +153,25 @@ spec:
             - forProvider
             type: object
           status:
-            description: A BindingStatus represents the observed state of a Binding.
+            description: A ExchangeStatus represents the observed state of a Exchange.
             properties:
               atProvider:
-                description: BindingObservation are the observable fields of a Binding.
+                description: ExchangeObservation are the observable fields of a Exchange.
                 properties:
                   arguments:
                     additionalProperties:
                       type: string
                     type: object
-                  destination:
+                  autoDelete:
+                    type: boolean
+                  durable:
+                    type: boolean
+                  name:
                     type: string
-                  destinationType:
-                    type: string
-                  propertiesKey:
-                    type: string
-                  routingKey:
-                    type: string
-                  source:
+                  type:
                     type: string
                   vhost:
                     type: string
-                required:
-                - arguments
-                - destination
-                - destinationType
-                - propertiesKey
-                - routingKey
-                - source
-                - vhost
                 type: object
               conditions:
                 description: Conditions of the resource.
