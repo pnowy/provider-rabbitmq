@@ -4,18 +4,18 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.19.0
-  name: users.rabbitmq.m.crossplane.io
+  name: queues.core.rabbitmq.m.crossplane.io
 spec:
-  group: rabbitmq.m.crossplane.io
+  group: core.rabbitmq.m.crossplane.io
   names:
     categories:
     - crossplane
     - managed
     - rabbitmq
-    kind: User
-    listKind: UserList
-    plural: users
-    singular: user
+    kind: Queue
+    listKind: QueueList
+    plural: queues
+    singular: queue
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
@@ -34,7 +34,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: User - manage users
+        description: Queue - manage queues
         properties:
           apiVersion:
             description: |-
@@ -54,44 +54,46 @@ spec:
           metadata:
             type: object
           spec:
-            description: A UserSpec defines the desired state of a User.
+            description: A QueueSpec defines the desired state of a Queue.
             properties:
               forProvider:
-                description: UserParameters are the configurable fields of a User.
+                description: QueueParameters are the configurable fields of a Queue.
                 properties:
-                  userSettings:
-                    properties:
-                      password:
-                        type: string
-                      passwordSecretRef:
-                        description: A SecretKeySelector is a reference to a secret
-                          key in an arbitrary namespace.
-                        properties:
-                          key:
-                            description: The key to select.
-                            type: string
-                          name:
-                            description: Name of the secret.
-                            type: string
-                          namespace:
-                            description: Namespace of the secret.
-                            type: string
-                        required:
-                        - key
-                        - name
-                        - namespace
-                        type: object
-                      tags:
-                        items:
-                          type: string
-                        type: array
-                    type: object
-                  username:
+                  name:
                     type: string
+                  queueSettings:
+                    description: QueueSettings
+                    properties:
+                      arguments:
+                        additionalProperties:
+                          type: string
+                        type: object
+                      autoDelete:
+                        type: boolean
+                      durable:
+                        type: boolean
+                      type:
+                        type: string
+                    type: object
+                    x-kubernetes-validations:
+                    - message: Type is immutable once set
+                      rule: '!has(oldSelf.type) || self.type == oldSelf.type'
+                    - message: Durable is immutable once set
+                      rule: '!has(oldSelf.durable) || self.durable == oldSelf.durable'
+                    - message: AutoDelete is immutable once set
+                      rule: '!has(oldSelf.autoDelete) || self.autoDelete == oldSelf.autoDelete'
+                    - message: Arguments are immutable once set
+                      rule: '!has(oldSelf.arguments) || self.arguments == oldSelf.arguments'
+                  vhost:
+                    type: string
+                required:
+                - vhost
                 type: object
                 x-kubernetes-validations:
-                - message: Username is immutable once set
-                  rule: '!has(oldSelf.username) || self.username == oldSelf.username'
+                - message: Name is immutable once set
+                  rule: '!has(oldSelf.name) || self.name == oldSelf.name'
+                - message: Vhost is immutable once set
+                  rule: '!has(oldSelf.vhost) || self.vhost == oldSelf.vhost'
               managementPolicies:
                 default:
                 - '*'
@@ -151,19 +153,27 @@ spec:
             - forProvider
             type: object
           status:
-            description: A UserStatus represents the observed state of a User.
+            description: A QueueStatus represents the observed state of a Queue.
             properties:
               atProvider:
-                description: UserObservation are the observable fields of a User.
+                description: QueueObservation are the observable fields of a Queue.
                 properties:
-                  hashingAlgorithm:
-                    type: string
-                  tags:
-                    items:
+                  arguments:
+                    additionalProperties:
                       type: string
-                    type: array
-                  username:
+                    type: object
+                  autoDelete:
+                    type: boolean
+                  durable:
+                    type: boolean
+                  name:
                     type: string
+                  type:
+                    type: string
+                  vhost:
+                    type: string
+                required:
+                - vhost
                 type: object
               conditions:
                 description: Conditions of the resource.

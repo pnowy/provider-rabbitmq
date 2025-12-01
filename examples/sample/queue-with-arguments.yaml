@@ -1,4 +1,4 @@
-apiVersion: core.rabbitmq.crossplane.io/v1alpha1
+apiVersion: core.rabbitmq.m.crossplane.io/v1alpha1
 kind: Queue
 metadata:
   name: myqueue-with-arguments

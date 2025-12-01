@@ -4,18 +4,18 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.19.0
-  name: vhosts.rabbitmq.m.crossplane.io
+  name: bindings.core.rabbitmq.m.crossplane.io
 spec:
-  group: rabbitmq.m.crossplane.io
+  group: core.rabbitmq.m.crossplane.io
   names:
     categories:
     - crossplane
     - managed
     - rabbitmq
-    kind: Vhost
-    listKind: VhostList
-    plural: vhosts
-    singular: vhost
+    kind: Binding
+    listKind: BindingList
+    plural: bindings
+    singular: binding
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
@@ -34,7 +34,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: Vhost - manage vhosts
+        description: Binding - configure bindings between exchanges and queues
         properties:
           apiVersion:
             description: |-
@@ -54,35 +54,46 @@ spec:
           metadata:
             type: object
           spec:
-            description: A VhostSpec defines the desired state of a Vhost.
+            description: A BindingSpec defines the desired state of a Binding.
             properties:
               forProvider:
-                description: VhostParameters are the configurable fields of a Vhost
+                description: BindingParameters are the configurable fields of a Binding.
                 properties:
-                  hostName:
-                    type: string
-                  vhostSettings:
-                    properties:
-                      defaultQueueType:
-                        description: Type of queue to create in virtual host when
-                          unspecified in queue level
-                        type: string
-                      description:
-                        description: Virtual host description
-                        type: string
-                      tags:
-                        description: Virtual host tags
-                        items:
-                          type: string
-                        type: array
-                      tracing:
-                        description: True if tracing should be enabled
-                        type: boolean
+                  arguments:
+                    additionalProperties:
+                      type: string
                     type: object
+                  destination:
+                    type: string
+                  destinationType:
+                    type: string
+                  routingKey:
+                    type: string
+                  source:
+                    type: string
+                  vhost:
+                    type: string
+                required:
+                - destination
+                - destinationType
+                - routingKey
+                - source
+                - vhost
                 type: object
                 x-kubernetes-validations:
-                - message: HostName is immutable once set
-                  rule: '!has(oldSelf.hostName) || self.hostName == oldSelf.hostName'
+                - message: Destination is immutable once set
+                  rule: '!has(oldSelf.destination) || self.destination == oldSelf.destination'
+                - message: Vhost is immutable once set
+                  rule: '!has(oldSelf.vhost) || self.vhost == oldSelf.vhost'
+                - message: Destination Type is immutable once set
+                  rule: '!has(oldSelf.destinationType) || self.destinationType ==
+                    oldSelf.destinationType'
+                - message: Source is immutable once set
+                  rule: '!has(oldSelf.source) || self.source == oldSelf.source'
+                - message: Routing Key is immutable once set
+                  rule: '!has(oldSelf.routingKey) || self.routingKey == oldSelf.routingKey'
+                - message: Arguments are immutable once set
+                  rule: '!has(oldSelf.arguments) || self.arguments == oldSelf.arguments'
               managementPolicies:
                 default:
                 - '*'
@@ -142,28 +153,35 @@ spec:
             - forProvider
             type: object
           status:
-            description: A VhostStatus represents the observed state of a Vhost.
+            description: A BindingStatus represents the observed state of a Binding.
             properties:
               atProvider:
-                description: VhostObservation are the observable fields of a Vhost.
+                description: BindingObservation are the observable fields of a Binding.
                 properties:
-                  defaultQueueType:
+                  arguments:
+                    additionalProperties:
+                      type: string
+                    type: object
+                  destination:
                     type: string
-                  description:
+                  destinationType:
                     type: string
-                  messages:
-                    type: integer
-                  messagesReady:
-                    type: integer
-                  messagesUnacknowledged:
-                    type: integer
-                  name:
+                  propertiesKey:
+                    type: string
+                  routingKey:
+                    type: string
+                  source:
+                    type: string
+                  vhost:
                     type: string
                 required:
-                - messages
-                - messagesReady
-                - messagesUnacknowledged
-                - name
+                - arguments
+                - destination
+                - destinationType
+                - propertiesKey
+                - routingKey
+                - source
+                - vhost
                 type: object
               conditions:
                 description: Conditions of the resource.

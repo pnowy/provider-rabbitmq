@@ -16,7 +16,7 @@ limitations under the License.
 
 // Package v1alpha1 contains the v1alpha1 group Sample resources of the RabbitMq provider.
 // +kubebuilder:object:generate=true
-// +groupName=core.rabbitmq.crossplane.io
+// +groupName=core.rabbitmq.m.crossplane.io
 // +versionName=v1alpha1
 package v1alpha1
 

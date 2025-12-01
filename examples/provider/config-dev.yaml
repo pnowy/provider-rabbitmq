@@ -11,7 +11,7 @@ stringData: # for local development/running the rabbitmq address must be forward
       "endpoint": "http://localhost:15672"
     }
 ---
-apiVersion: rabbitmq.crossplane.io/v1alpha1
+apiVersion: rabbitmq.m.crossplane.io/v1alpha1
 kind: ProviderConfig
 metadata:
   name: provider-rabbitmq

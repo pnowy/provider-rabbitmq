@@ -16,7 +16,7 @@ stringData:
       "endpoint": "http://rabbitmq.rabbitmq.svc.cluster.local:15672"
     }
 ---
-apiVersion: rabbitmq.crossplane.io/v1alpha1
+apiVersion: rabbitmq.m.crossplane.io/v1alpha1
 kind: ProviderConfig
 metadata:
   name: provider-rabbitmq
@@ -29,7 +29,7 @@ spec:
       namespace: rabbitmq
       key: credentials
 ---
-apiVersion: rabbitmq.crossplane.io/v1alpha1
+apiVersion: rabbitmq.m.crossplane.io/v1alpha1
 kind: ClusterProviderConfig
 metadata:
   name: provider-rabbitmq

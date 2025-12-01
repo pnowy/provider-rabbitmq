@@ -4,18 +4,18 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.19.0
-  name: exchanges.rabbitmq.m.crossplane.io
+  name: permissions.core.rabbitmq.m.crossplane.io
 spec:
-  group: rabbitmq.m.crossplane.io
+  group: core.rabbitmq.m.crossplane.io
   names:
     categories:
     - crossplane
     - managed
     - rabbitmq
-    kind: Exchange
-    listKind: ExchangeList
-    plural: exchanges
-    singular: exchange
+    kind: Permissions
+    listKind: PermissionsList
+    plural: permissions
+    singular: permissions
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
@@ -34,7 +34,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: Exchange - manage exchanges
+        description: Permissions - manage user permissions within virtual hosts
         properties:
           apiVersion:
             description: |-
@@ -54,45 +54,38 @@ spec:
           metadata:
             type: object
           spec:
-            description: A ExchangeSpec defines the desired state of a Exchange.
+            description: A PermissionsSpec defines the desired state of a Permissions.
             properties:
               forProvider:
-                description: ExchangeParameters are the configurable fields of a Exchange.
+                description: PermissionsParameters are the configurable fields of
+                  a Permissions.
                 properties:
-                  exchangeSettings:
-                    description: ExchangeSettings
+                  permissions:
                     properties:
-                      arguments:
-                        additionalProperties:
-                          type: string
-                        type: object
-                      autoDelete:
-                        type: boolean
-                      durable:
-                        type: boolean
-                      type:
+                      configure:
                         type: string
+                      read:
+                        type: string
+                      write:
+                        type: string
+                    required:
+                    - configure
+                    - read
+                    - write
                     type: object
-                    x-kubernetes-validations:
-                    - message: Type is immutable once set
-                      rule: '!has(oldSelf.type) || self.type == oldSelf.type'
-                    - message: Durable is immutable once set
-                      rule: '!has(oldSelf.durable) || self.durable == oldSelf.durable'
-                    - message: AutoDelete is immutable once set
-                      rule: '!has(oldSelf.autoDelete) || self.autoDelete == oldSelf.autoDelete'
-                    - message: Arguments are immutable once set
-                      rule: '!has(oldSelf.arguments) || self.arguments == oldSelf.arguments'
-                  name:
+                  user:
                     type: string
                   vhost:
                     type: string
                 required:
+                - permissions
+                - user
                 - vhost
                 type: object
                 x-kubernetes-validations:
-                - message: Name is immutable once set
-                  rule: '!has(oldSelf.name) || self.name == oldSelf.name'
-                - message: Vhost is immutable once
+                - message: User is immutable once set
+                  rule: '!has(oldSelf.user) || self.user == oldSelf.user'
+                - message: Vhost is immutable once set
                   rule: '!has(oldSelf.vhost) || self.vhost == oldSelf.vhost'
               managementPolicies:
                 default:
@@ -153,25 +146,28 @@ spec:
             - forProvider
             type: object
           status:
-            description: A ExchangeStatus represents the observed state of a Exchange.
+            description: A PermissionsStatus represents the observed state of a Permissions.
             properties:
               atProvider:
-                description: ExchangeObservation are the observable fields of a Exchange.
+                description: PermissionsObservation are the observable fields of a
+                  Permissions.
                 properties:
-                  arguments:
-                    additionalProperties:
-                      type: string
-                    type: object
-                  autoDelete:
-                    type: boolean
-                  durable:
-                    type: boolean
-                  name:
+                  configure:
                     type: string
-                  type:
+                  read:
+                    type: string
+                  user:
                     type: string
                   vhost:
                     type: string
+                  write:
+                    type: string
+                required:
+                - configure
+                - read
+                - user
+                - vhost
+                - write
                 type: object
               conditions:
                 description: Conditions of the resource.
