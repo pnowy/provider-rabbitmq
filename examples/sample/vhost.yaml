@@ -2,6 +2,7 @@ apiVersion: core.rabbitmq.crossplane.io/v1alpha1
 kind: Vhost
 metadata:
   name: demo
+  namespace: rabbitmq
 spec:
   forProvider:
     hostName: demo
@@ -10,3 +11,4 @@ spec:
       description: "Demo Vhost"
   providerConfigRef:
     name: provider-rabbitmq
+    kind: ProviderConfig

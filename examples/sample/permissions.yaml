@@ -2,6 +2,7 @@ apiVersion: core.rabbitmq.crossplane.io/v1alpha1
 kind: Permissions
 metadata:
   name: demo-user-permissions
+  namespace: rabbitmq
 spec:
   forProvider:
     vhost: demo
@@ -12,3 +13,4 @@ spec:
       read: .*
   providerConfigRef:
     name: provider-rabbitmq
+    kind: ProviderConfig

@@ -1,7 +1,8 @@
 apiVersion: core.rabbitmq.crossplane.io/v1alpha1
 kind: Queue
 metadata:
-  name: myqueue
+  name: myqueue-with-arguments
+  namespace: rabbitmq
 spec:
   forProvider:
     vhost: demo
@@ -11,3 +12,4 @@ spec:
         "x-message-ttl": "30000"
   providerConfigRef:
     name: provider-rabbitmq
+    kind: ProviderConfig

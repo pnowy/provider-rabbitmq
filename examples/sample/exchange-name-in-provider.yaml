@@ -2,13 +2,15 @@ apiVersion: core.rabbitmq.crossplane.io/v1alpha1
 kind: Exchange
 metadata:
   name: myexchange-name-in-provider
+  namespace: rabbitmq
 spec:
   forProvider:
     name: crossplane-exchange
     vhost: demo
-    exchange_settings:
+    exchangeSettings:
       type: direct
       durable: false
-      auto_delete: true
+      autoDelete: true
   providerConfigRef:
     name: provider-rabbitmq
+    kind: ProviderConfig

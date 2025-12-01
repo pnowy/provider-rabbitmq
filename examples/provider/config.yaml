@@ -7,7 +7,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: rabbitmq-credentials
-  namespace: crossplane-system
+  namespace: rabbitmq
 stringData:
   credentials: |
     {
@@ -20,12 +20,13 @@ apiVersion: rabbitmq.crossplane.io/v1alpha1
 kind: ProviderConfig
 metadata:
   name: provider-rabbitmq
+  namespace: rabbitmq
 spec:
   credentials:
     source: Secret
     secretRef:
       name: rabbitmq-credentials
-      namespace: crossplane-system
+      namespace: rabbitmq
       key: credentials
 ---
 apiVersion: rabbitmq.crossplane.io/v1alpha1
@@ -37,5 +38,5 @@ spec:
     source: Secret
     secretRef:
       name: rabbitmq-credentials
-      namespace: crossplane-system
+      namespace: rabbitmq
       key: credentials
