@@ -4,19 +4,19 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.19.0
-  name: providerconfigusages.rabbit.crossplane.io
+  name: clusterproviderconfigusages.rabbitmq.crossplane.io
 spec:
-  group: rabbit.crossplane.io
+  group: rabbitmq.crossplane.io
   names:
     categories:
     - crossplane
     - provider
     - template
-    kind: ProviderConfigUsage
-    listKind: ProviderConfigUsageList
-    plural: providerconfigusages
-    singular: providerconfigusage
-  scope: Namespaced
+    kind: ClusterProviderConfigUsage
+    listKind: ClusterProviderConfigUsageList
+    plural: clusterproviderconfigusages
+    singular: clusterproviderconfigusage
+  scope: Cluster
   versions:
   - additionalPrinterColumns:
     - jsonPath: .metadata.creationTimestamp
@@ -34,7 +34,8 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: A ProviderConfigUsage indicates that a resource is using a ProviderConfig.
+        description: A ClusterProviderConfigUsage indicates that a resource is using
+          a ClusterProviderConfig.
         properties:
           apiVersion:
             description: |-
