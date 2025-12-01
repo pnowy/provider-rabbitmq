@@ -18,6 +18,13 @@ package controller
 
 import (
 	"github.com/crossplane/crossplane-runtime/v2/pkg/controller"
+	cBinding "github.com/pnowy/provider-rabbitmq/internal/controller/cluster/binding"
+	cConfig "github.com/pnowy/provider-rabbitmq/internal/controller/cluster/config"
+	cExchange "github.com/pnowy/provider-rabbitmq/internal/controller/cluster/exchange"
+	cPermissions "github.com/pnowy/provider-rabbitmq/internal/controller/cluster/permissions"
+	cQueue "github.com/pnowy/provider-rabbitmq/internal/controller/cluster/queue"
+	cUser "github.com/pnowy/provider-rabbitmq/internal/controller/cluster/user"
+	cVhost "github.com/pnowy/provider-rabbitmq/internal/controller/cluster/vhost"
 	"github.com/pnowy/provider-rabbitmq/internal/controller/namespaced/binding"
 	"github.com/pnowy/provider-rabbitmq/internal/controller/namespaced/config"
 	"github.com/pnowy/provider-rabbitmq/internal/controller/namespaced/exchange"
@@ -33,12 +40,19 @@ import (
 func SetupGated(mgr ctrl.Manager, o controller.Options) error {
 	for _, setup := range []func(ctrl.Manager, controller.Options) error{
 		config.Setup,
-		vhost.SetupGated,
-		user.SetupGated,
-		exchange.SetupGated,
-		queue.SetupGated,
 		binding.SetupGated,
+		exchange.SetupGated,
 		permissions.SetupGated,
+		queue.SetupGated,
+		user.SetupGated,
+		vhost.SetupGated,
+		cConfig.Setup,
+		cBinding.SetupGated,
+		cExchange.SetupGated,
+		cPermissions.SetupGated,
+		cQueue.SetupGated,
+		cUser.SetupGated,
+		cVhost.SetupGated,
 	} {
 		if err := setup(mgr, o); err != nil {
 			return err

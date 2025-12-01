@@ -87,6 +87,17 @@ The integration tests use the uptest framework to run tests against the provider
 
 Update `UPTEST_INPUT_MANIFESTS` if you want to include extra manifests for tests.
 
+## Cluster scope resources
+
+Script TODOs:
+
+- copy all apis/namespaced to apis/cluster and replace in files:
+    - `groupName=rabbitmq.m.crossplane.io` to `groupName=rabbitmq.crossplane.io`
+    - `Group   = "rabbitmq.m.crossplane.io"` to `Group   = "rabbitmq.crossplane.io"`
+    - `kubebuilder:resource:scope=Namespaced` to `kubebuilder:resource:scope=Cluster`
+- copy all from internal/controller/namespaced (excluding `_test.go` files) to internal/controller/cluster and replace in files:
+    - `"github.com/pnowy/provider-rabbitmq/apis/namespaced/v1alpha1"` to `"github.com/pnowy/provider-rabbitmq/apis/cluster/v1alpha1"`
+
 ## References
 
 Refer to Crossplane's [CONTRIBUTING.md](https://github.com/crossplane/crossplane/blob/master/CONTRIBUTING.md) file for more information on how the Crossplane
