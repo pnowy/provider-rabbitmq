@@ -8,6 +8,3 @@ metadata:
     meta.crossplane.io/license: Apache-2.0
     meta.crossplane.io/description: |
       A Crossplane provider for RabbitMQ management.
-spec:
-  capabilities:
-    - safe-start
