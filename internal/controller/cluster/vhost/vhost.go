@@ -129,14 +129,14 @@ type connector struct {
 // 3. Getting the credentials specified by the ProviderConfig.
 // 4. Using the credentials to form a client.
 func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
-	//cr, ok := mg.(*v1alpha1.Vhost)
-	//if !ok {
-	//	return nil, errors.New(errNotVhost)
-	//}
-	//
-	//if err := c.usage.Track(ctx, cr); err != nil {
-	//	return nil, errors.Wrap(err, errTrackPCUsage)
-	//}
+	cr, ok := mg.(*v1alpha1.Vhost)
+	if !ok {
+		return nil, errors.New(errNotVhost)
+	}
+
+	if err := c.usage.Track(ctx, cr); err != nil {
+		return nil, errors.Wrap(err, errTrackPCUsage)
+	}
 
 	var cd nsApisv1alpha1.ProviderCredentials
 
