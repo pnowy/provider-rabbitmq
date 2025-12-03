@@ -132,6 +132,7 @@ quickstart: $(KIND) $(KUBECTL)
 	@$(INFO) Installing Crossplane
 	@helm dep update helm/crossplane
 	@helm upgrade crossplane helm/crossplane --install --namespace crossplane-system --create-namespace
+	sleep 10
 	@$(INFO) Installing RabbitMq
 	@helm dep update helm/rabbitmq
 	@helm upgrade rabbitmq helm/rabbitmq --install --namespace rabbitmq --create-namespace
