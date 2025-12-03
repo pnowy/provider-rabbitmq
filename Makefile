@@ -145,7 +145,11 @@ dev-clean: $(KIND) $(KUBECTL)
 	@$(INFO) Deleting kind cluster
 	@$(KIND) delete cluster --name=$(PROJECT_NAME)-dev
 
-.PHONY: submodules fallthrough test-integration run dev dev-clean
+quickstart-clean: $(KIND) $(KUBECTL)
+	@$(INFO) Deleting kind cluster
+	@$(KIND) delete cluster --name=crossplane-rabbitmq-quickstart
+
+.PHONY: submodules fallthrough test-integration run quickstart dev dev-clean quickstart-clean
 
 # ====================================================================================
 # Special Targets
