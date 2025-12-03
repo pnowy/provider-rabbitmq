@@ -1,0 +1,13 @@
+apiVersion: core.rabbitmq.crossplane.io/v1alpha1
+kind: Vhost
+metadata:
+  name: demo
+spec:
+  forProvider:
+    hostName: demo
+    vhostSettings:
+      defaultQueueType: quorum
+      description: "Demo Vhost"
+  providerConfigRef:
+    name: provider-rabbitmq
+    kind: ProviderConfig

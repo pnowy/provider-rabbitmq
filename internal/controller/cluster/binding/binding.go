@@ -25,6 +25,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/v2/pkg/logging"
 	"github.com/pnowy/provider-rabbitmq/apis/cluster/core/v1alpha1"
 	apisv1alpha1 "github.com/pnowy/provider-rabbitmq/apis/cluster/v1alpha1"
+	nsApisv1alpha1 "github.com/pnowy/provider-rabbitmq/apis/namespaced/v1alpha1"
 
 	"github.com/pnowy/provider-rabbitmq/internal/rabbitmqmeta"
 
@@ -137,7 +138,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		return nil, errors.Wrap(err, errTrackPCUsage)
 	}
 
-	var cd apisv1alpha1.ProviderCredentials
+	var cd nsApisv1alpha1.ProviderCredentials
 
 	// Switch to ModernManaged resource to get ProviderConfigRef
 	m := mg.(resource.ModernManaged)
@@ -151,7 +152,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		}
 		cd = pc.Spec.Credentials
 	case "ClusterProviderConfig":
-		cpc := &apisv1alpha1.ClusterProviderConfig{}
+		cpc := &nsApisv1alpha1.ClusterProviderConfig{}
 		if err := c.kube.Get(ctx, types.NamespacedName{Name: ref.Name}, cpc); err != nil {
 			return nil, errors.Wrap(err, errGetCPC)
 		}

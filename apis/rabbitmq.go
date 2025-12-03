@@ -18,6 +18,8 @@ limitations under the License.
 package apis
 
 import (
+	clusterCorev1alpha1 "github.com/pnowy/provider-rabbitmq/apis/cluster/core/v1alpha1"
+	clusterRabbitmqv1alpha1 "github.com/pnowy/provider-rabbitmq/apis/cluster/v1alpha1"
 	corev1alpha1 "github.com/pnowy/provider-rabbitmq/apis/namespaced/core/v1alpha1"
 	rabbitmqv1alpha1 "github.com/pnowy/provider-rabbitmq/apis/namespaced/v1alpha1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -27,7 +29,9 @@ func init() {
 	// Register the types with the Scheme so the components can map objects to GroupVersionKinds and back
 	AddToSchemes = append(AddToSchemes,
 		rabbitmqv1alpha1.SchemeBuilder.AddToScheme,
+		clusterRabbitmqv1alpha1.SchemeBuilder.AddToScheme,
 		corev1alpha1.SchemeBuilder.AddToScheme,
+		clusterCorev1alpha1.SchemeBuilder.AddToScheme,
 	)
 }
 

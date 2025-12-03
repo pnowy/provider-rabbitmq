@@ -1,0 +1,16 @@
+apiVersion: core.rabbitmq.crossplane.io/v1alpha1
+kind: Binding
+metadata:
+  name: my-binding
+spec:
+  forProvider:
+    vhost: demo
+    source: myexchange
+    destinationType: queue
+    destination: myqueue
+    routingKey: "my-custom-key"
+    arguments:
+      region: europe
+  providerConfigRef:
+    name: provider-rabbitmq
+    kind: ProviderConfig

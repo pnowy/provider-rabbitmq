@@ -29,10 +29,7 @@ import (
 // Setup adds a controller that reconciles ProviderConfigs by accounting for
 // their current usage.
 func Setup(mgr ctrl.Manager, o controller.Options) error {
-	if err := setupNamespacedProviderConfig(mgr, o); err != nil {
-		return err
-	}
-	return setupClusterProviderConfig(mgr, o)
+	return setupNamespacedProviderConfig(mgr, o)
 }
 
 func setupNamespacedProviderConfig(mgr ctrl.Manager, o controller.Options) error {
@@ -53,25 +50,5 @@ func setupNamespacedProviderConfig(mgr ctrl.Manager, o controller.Options) error
 		WithOptions(o.ForControllerRuntime()).
 		For(&v1alpha2.ProviderConfig{}).
 		Watches(&v1alpha2.ProviderConfigUsage{}, &resource.EnqueueRequestForProviderConfig{}).
-		Complete(ratelimiter.NewReconciler(name, r, o.GlobalRateLimiter))
-}
-
-func setupClusterProviderConfig(mgr ctrl.Manager, o controller.Options) error {
-	name := providerconfig.ControllerName(v1alpha2.ClusterProviderConfigGroupKind)
-	of := resource.ProviderConfigKinds{
-		Config:    v1alpha2.ClusterProviderConfigGroupVersionKind,
-		Usage:     v1alpha2.ClusterProviderConfigUsageGroupVersionKind,
-		UsageList: v1alpha2.ClusterProviderConfigUsageListGroupVersionKind,
-	}
-
-	r := providerconfig.NewReconciler(mgr, of,
-		providerconfig.WithLogger(o.Logger.WithValues("controller", name)),
-		providerconfig.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name))))
-
-	return ctrl.NewControllerManagedBy(mgr).
-		Named(name).
-		WithOptions(o.ForControllerRuntime()).
-		For(&v1alpha2.ClusterProviderConfig{}).
-		Watches(&v1alpha2.ClusterProviderConfigUsage{}, &resource.EnqueueRequestForProviderConfig{}).
 		Complete(ratelimiter.NewReconciler(name, r, o.GlobalRateLimiter))
 }

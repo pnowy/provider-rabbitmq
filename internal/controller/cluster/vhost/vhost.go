@@ -22,6 +22,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/v2/pkg/logging"
 	"github.com/pnowy/provider-rabbitmq/apis/cluster/core/v1alpha1"
 	apisv1alpha1 "github.com/pnowy/provider-rabbitmq/apis/cluster/v1alpha1"
+	nsApisv1alpha1 "github.com/pnowy/provider-rabbitmq/apis/namespaced/v1alpha1"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	"github.com/google/go-cmp/cmp"
@@ -128,16 +129,16 @@ type connector struct {
 // 3. Getting the credentials specified by the ProviderConfig.
 // 4. Using the credentials to form a client.
 func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
-	cr, ok := mg.(*v1alpha1.Vhost)
-	if !ok {
-		return nil, errors.New(errNotVhost)
-	}
+	//cr, ok := mg.(*v1alpha1.Vhost)
+	//if !ok {
+	//	return nil, errors.New(errNotVhost)
+	//}
+	//
+	//if err := c.usage.Track(ctx, cr); err != nil {
+	//	return nil, errors.Wrap(err, errTrackPCUsage)
+	//}
 
-	if err := c.usage.Track(ctx, cr); err != nil {
-		return nil, errors.Wrap(err, errTrackPCUsage)
-	}
-
-	var cd apisv1alpha1.ProviderCredentials
+	var cd nsApisv1alpha1.ProviderCredentials
 
 	// Switch to ModernManaged resource to get ProviderConfigRef
 	m := mg.(resource.ModernManaged)
@@ -151,7 +152,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		}
 		cd = pc.Spec.Credentials
 	case "ClusterProviderConfig":
-		cpc := &apisv1alpha1.ClusterProviderConfig{}
+		cpc := &nsApisv1alpha1.ClusterProviderConfig{}
 		if err := c.kube.Get(ctx, types.NamespacedName{Name: ref.Name}, cpc); err != nil {
 			return nil, errors.Wrap(err, errGetCPC)
 		}

@@ -123,7 +123,7 @@ dev-init: $(KIND) $(KUBECTL)
 	@helm upgrade rabbitmq helm/rabbitmq --install --namespace rabbitmq --create-namespace
 	@$(INFO) Installing Provider RabbitMq CRDs
 	@$(KUBECTL) apply -R -f package/crds
-	@$(KUBECTL) apply -f examples/provider/config-dev.yaml
+	@$(KUBECTL) apply -f examples/provider/development
 
 quickstart: $(KIND) $(KUBECTL)
 	@$(INFO) Creating kind cluster

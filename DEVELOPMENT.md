@@ -65,8 +65,8 @@ After that implement the controller for the new type.
 
 ## Integration Tests
 
-The provider includes integration tests that test the operator against a real RabbitMQ instance. These tests verify that the operator can create, update, and
-delete RabbitMQ resources correctly.
+The provider includes integration tests that test the operator against a real RabbitMQ instance. These tests verify that the operator can
+create, update, and delete RabbitMQ resources correctly.
 
 To run the integration tests:
 
@@ -89,17 +89,26 @@ Update `UPTEST_INPUT_MANIFESTS` if you want to include extra manifests for tests
 
 ## Cluster scope resources
 
-Script TODOs:
+The cluster scope resources is a kind-of copy namespaced resources with a couple of changes:
 
-- copy all apis/namespaced to apis/cluster and replace in files:
-    - `groupName=rabbitmq.m.crossplane.io` to `groupName=rabbitmq.crossplane.io`
-    - `Group   = "rabbitmq.m.crossplane.io"` to `Group   = "rabbitmq.crossplane.io"`
-    - `kubebuilder:resource:scope=Namespaced` to `kubebuilder:resource:scope=Cluster`
-- copy all from internal/controller/namespaced (excluding `_test.go` files) to internal/controller/cluster and replace in files:
-    - `"github.com/pnowy/provider-rabbitmq/apis/namespaced/v1alpha1"` to `"github.com/pnowy/provider-rabbitmq/apis/cluster/v1alpha1"`
+- different groups and scope for `apis/core/v1alpha1`:
+    - `groupName=rabbitmq.crossplane.io` instead of `groupName=rabbitmq.m.crossplane.io`
+    - `Group   = "rabbitmq.crossplane.io"` instead of `Group   = "rabbitmq.m.crossplane.io"`
+    - `kubebuilder:resource:scope=Cluster` instead of `kubebuilder:resource:scope=Namespaced`
+- separated cluster-scoped `ProviderConfig` and `ProvidedConfigUsage` resources but re-used `ClusterProviderConfig` from group namespace
+  specific `rabbitmq.m.crossplane.io`
+- shared `ProviderCredentials` struct from namespace scoped `ProviderConfig` with cluster scoped `ClusterProviderConfig` in order to be able
+  to re-use controller logic when retrieving credentials
+- adjusted controller code
+    - `"github.com/pnowy/provider-rabbitmq/apis/cluster/core/v1alpha1"` instead of
+      `"github.com/pnowy/provider-rabbitmq/apis/namespaced/core/v1alpha1"`
+    - added `nsApisv1alpha1 "github.com/pnowy/provider-rabbitmq/apis/namespaced/v1alpha1"` as required for provider credentials:
+      `var cd nsApisv1alpha1.ProviderCredentials`
 
 ## References
 
-Refer to Crossplane's [CONTRIBUTING.md](https://github.com/crossplane/crossplane/blob/master/CONTRIBUTING.md) file for more information on how the Crossplane
-community prefers to work. The [Provider Development](https://github.com/crossplane/crossplane/blob/master/contributing/guide-provider-development.md) guide may
+Refer to Crossplane's [CONTRIBUTING.md](https://github.com/crossplane/crossplane/blob/master/CONTRIBUTING.md) file for more information on
+how the Crossplane
+community prefers to work.
+The [Provider Development](https://github.com/crossplane/crossplane/blob/master/contributing/guide-provider-development.md) guide may
 also be of use.
