@@ -137,6 +137,7 @@ quickstart: $(KIND) $(KUBECTL)
 	@helm dep update helm/rabbitmq
 	@helm upgrade rabbitmq helm/rabbitmq --install --namespace rabbitmq --create-namespace
 	@$(INFO) Installing RabbitMq provider
+	sleep 10
 	@$(KUBECTL) apply -f examples/provider/provider.yaml
 	sleep 10
 	@$(KUBECTL) apply -f examples/provider/config.yaml
