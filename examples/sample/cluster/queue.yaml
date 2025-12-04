@@ -7,4 +7,3 @@ spec:
     vhost: demo
   providerConfigRef:
     name: provider-rabbitmq
-    kind: ProviderConfig

@@ -11,4 +11,3 @@ spec:
         - "administrator"
   providerConfigRef:
     name: provider-rabbitmq
-    kind: ProviderConfig

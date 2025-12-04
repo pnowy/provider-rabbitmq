@@ -11,4 +11,3 @@ spec:
         "x-message-ttl": "30000"
   providerConfigRef:
     name: provider-rabbitmq
-    kind: ProviderConfig

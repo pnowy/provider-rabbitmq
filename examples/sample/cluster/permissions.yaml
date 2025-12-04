@@ -12,4 +12,3 @@ spec:
       read: .*
   providerConfigRef:
     name: provider-rabbitmq
-    kind: ProviderConfig

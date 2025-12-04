@@ -14,4 +14,3 @@ spec:
         "x-expires": "300000"  # 5 minutes
   providerConfigRef:
     name: provider-rabbitmq
-    kind: ProviderConfig

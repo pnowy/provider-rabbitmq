@@ -10,4 +10,3 @@ spec:
       description: "Demo Vhost"
   providerConfigRef:
     name: provider-rabbitmq
-    kind: ProviderConfig

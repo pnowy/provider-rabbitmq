@@ -12,4 +12,3 @@ spec:
       autoDelete: false
   providerConfigRef:
     name: provider-rabbitmq
-    kind: ProviderConfig

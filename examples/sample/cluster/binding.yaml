@@ -13,4 +13,3 @@ spec:
       region: europe
   providerConfigRef:
     name: provider-rabbitmq
-    kind: ProviderConfig

@@ -4,4 +4,6 @@ metadata:
   name: provider-rabbitmq
   namespace: crossplane-system
 spec:
-  package: xpkg.upbound.io/pnowy/provider-rabbitmq:v0.5.0
+  # package: xpkg.upbound.io/pnowy/provider-rabbitmq:v0.5.0
+  package: xpkg.upbound.io/pnowy/provider-rabbitmq:v0.5.0-23.g08c81bd
+
