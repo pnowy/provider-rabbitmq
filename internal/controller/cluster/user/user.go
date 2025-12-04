@@ -54,7 +54,6 @@ import (
 const (
 	errNotUser      = "managed resource is not a User custom resource"
 	errGetFailed    = "cannot get RabbitMq User"
-	errTrackPCUsage = "cannot track ProviderConfig usage"
 	errGetPC        = "cannot get ProviderConfig"
 	errGetCreds     = "cannot get credentials"
 	errCreateFailed = "cannot create RabbitMq user"

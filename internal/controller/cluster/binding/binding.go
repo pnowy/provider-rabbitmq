@@ -45,7 +45,6 @@ import (
 
 const (
 	errNotBinding                     = "managed resource is not a Binding custom resource"
-	errTrackPCUsage                   = "cannot track ProviderConfig usage"
 	errGetPC                          = "cannot get ProviderConfig"
 	errGetCreds                       = "cannot get credentials"
 	errNewClient                      = "cannot create new Service"
@@ -126,18 +125,16 @@ type connector struct {
 // 3. Getting the credentials specified by the ProviderConfig.
 // 4. Using the credentials to form a client.
 func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
-	var cd apisv1alpha1.ProviderCredentials
-
-	// Switch to ModernManaged resource to get ProviderConfigRef
-	m := mg.(resource.ModernManaged)
-	ref := m.GetProviderConfigReference()
-
+	cr, ok := mg.(*v1alpha1.Binding)
+	if !ok {
+		return nil, errors.New(errNotBinding)
+	}
 	pc := &apisv1alpha1.ProviderConfig{}
-	if err := c.kube.Get(ctx, types.NamespacedName{Name: ref.Name}, pc); err != nil {
+	if err := c.kube.Get(ctx, types.NamespacedName{Name: cr.GetProviderConfigReference().Name}, pc); err != nil {
 		return nil, errors.Wrap(err, errGetPC)
 	}
-	cd = pc.Spec.Credentials
 
+	cd := pc.Spec.Credentials
 	data, err := resource.CommonCredentialExtractor(ctx, cd.Source, c.kube, cd.CommonCredentialSelectors)
 	if err != nil {
 		return nil, errors.Wrap(err, errGetCreds)

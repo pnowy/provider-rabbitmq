@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -31,6 +32,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
@@ -40,13 +42,17 @@ import (
 
 	changelogsv1alpha1 "github.com/crossplane/crossplane-runtime/v2/apis/changelogs/proto/v1alpha1"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/controller"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/errors"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/feature"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/logging"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/ratelimiter"
+	authv1 "k8s.io/api/authorization/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
-	"github.com/pnowy/provider-rabbitmq/apis"
-	rabbitmq "github.com/pnowy/provider-rabbitmq/internal/controller"
+	apisCluster "github.com/pnowy/provider-rabbitmq/apis/cluster"
+	apisNamespaced "github.com/pnowy/provider-rabbitmq/apis/namespaced"
+	controllerCluster "github.com/pnowy/provider-rabbitmq/internal/controller/cluster"
+	controllerNamespaced "github.com/pnowy/provider-rabbitmq/internal/controller/namespaced"
 	"github.com/pnowy/provider-rabbitmq/internal/version"
 )
 
@@ -106,8 +112,9 @@ func main() {
 	})
 	kingpin.FatalIfError(err, "Cannot create controller manager")
 
-	kingpin.FatalIfError(apis.AddToScheme(mgr.GetScheme()), "Cannot add RabbitMq APIs to scheme")
-	kingpin.FatalIfError(apiextensionsv1.AddToScheme(mgr.GetScheme()), "Cannot add CustomResourceDefinition to scheme")
+	kingpin.FatalIfError(apiextensionsv1.AddToScheme(mgr.GetScheme()), "Cannot add apiextensions to scheme")
+	kingpin.FatalIfError(apisNamespaced.AddToScheme(mgr.GetScheme()), "Cannot add namespaced RabbitMq APIs to scheme")
+	kingpin.FatalIfError(apisCluster.AddToScheme(mgr.GetScheme()), "Cannot add cluster RabbitMq APIs to scheme")
 
 	metricRecorder := managed.NewMRMetricRecorder()
 	stateMetrics := statemetrics.NewMRStateMetrics()
@@ -149,10 +156,46 @@ func main() {
 		o.ChangeLogOptions = &clo
 	}
 
-	kingpin.FatalIfError(customresourcesgate.Setup(mgr, o), "Cannot setup CRD gate controller")
-	log.Info("Setup CRD gate controller finished")
-	kingpin.FatalIfError(rabbitmq.SetupGated(mgr, o), "Cannot setup Template controllers")
-	log.Info("Setup template controllers finished")
+	canSafeStart, err := canWatchCRD(context.Background(), mgr)
+	kingpin.FatalIfError(err, "SafeStart precheck failed")
+
+	if canSafeStart {
+		crdGate := new(gate.Gate[schema.GroupVersionKind])
+		o.Gate = crdGate
+		kingpin.FatalIfError(customresourcesgate.Setup(mgr, o), "Cannot setup CRD gate")
+		kingpin.FatalIfError(controllerCluster.SetupGated(mgr, o), "Cannot setup RabbitMq legacy controllers")
+		kingpin.FatalIfError(controllerNamespaced.SetupGated(mgr, o), "Cannot setup RabbitMq modern controllers")
+		log.Info("Controller SafeStart mode")
+	} else {
+		log.Info("Provider has missing RBAC permissions for watching CRDs, controller SafeStart capability will be disabled")
+		kingpin.FatalIfError(controllerCluster.Setup(mgr, o), "Cannot setup RabbitMq legacy controllers")
+		kingpin.FatalIfError(controllerNamespaced.Setup(mgr, o), "Cannot setup RabbitMq modern controllers")
+		log.Info("Controller legacy mode")
+	}
 	kingpin.FatalIfError(mgr.Start(ctrl.SetupSignalHandler()), "Cannot start controller manager")
-	log.Info("Controller manager started")
+}
+
+func canWatchCRD(ctx context.Context, mgr manager.Manager) (bool, error) {
+	if err := authv1.AddToScheme(mgr.GetScheme()); err != nil {
+		return false, err
+	}
+	verbs := []string{"get", "list", "watch"}
+	for _, verb := range verbs {
+		sar := &authv1.SelfSubjectAccessReview{
+			Spec: authv1.SelfSubjectAccessReviewSpec{
+				ResourceAttributes: &authv1.ResourceAttributes{
+					Group:    "apiextensions.k8s.io",
+					Resource: "customresourcedefinitions",
+					Verb:     verb,
+				},
+			},
+		}
+		if err := mgr.GetClient().Create(ctx, sar); err != nil {
+			return false, errors.Wrapf(err, "unable to perform RBAC check for verb %s on CustomResourceDefinitions", verb)
+		}
+		if !sar.Status.Allowed {
+			return false, nil
+		}
+	}
+	return true, nil
 }

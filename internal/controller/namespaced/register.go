@@ -14,17 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controller
+package namespaced
 
 import (
 	"github.com/crossplane/crossplane-runtime/v2/pkg/controller"
-	cBinding "github.com/pnowy/provider-rabbitmq/internal/controller/cluster/binding"
-	cConfig "github.com/pnowy/provider-rabbitmq/internal/controller/cluster/config"
-	cExchange "github.com/pnowy/provider-rabbitmq/internal/controller/cluster/exchange"
-	cPermissions "github.com/pnowy/provider-rabbitmq/internal/controller/cluster/permissions"
-	cQueue "github.com/pnowy/provider-rabbitmq/internal/controller/cluster/queue"
-	cUser "github.com/pnowy/provider-rabbitmq/internal/controller/cluster/user"
-	cVhost "github.com/pnowy/provider-rabbitmq/internal/controller/cluster/vhost"
 	"github.com/pnowy/provider-rabbitmq/internal/controller/namespaced/binding"
 	"github.com/pnowy/provider-rabbitmq/internal/controller/namespaced/config"
 	"github.com/pnowy/provider-rabbitmq/internal/controller/namespaced/exchange"
@@ -34,6 +27,23 @@ import (
 	"github.com/pnowy/provider-rabbitmq/internal/controller/namespaced/vhost"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
+
+func Setup(mgr ctrl.Manager, o controller.Options) error {
+	for _, setup := range []func(ctrl.Manager, controller.Options) error{
+		config.Setup,
+		binding.Setup,
+		exchange.Setup,
+		permissions.Setup,
+		queue.Setup,
+		user.Setup,
+		vhost.Setup,
+	} {
+		if err := setup(mgr, o); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
 // SetupGated Setup creates all RabbitMq controllers with the supplied logger and adds them to
 // the supplied manager.
@@ -46,13 +56,6 @@ func SetupGated(mgr ctrl.Manager, o controller.Options) error {
 		queue.SetupGated,
 		user.SetupGated,
 		vhost.SetupGated,
-		cConfig.Setup,
-		cBinding.SetupGated,
-		cExchange.SetupGated,
-		cPermissions.SetupGated,
-		cQueue.SetupGated,
-		cUser.SetupGated,
-		cVhost.SetupGated,
 	} {
 		if err := setup(mgr, o); err != nil {
 			return err
