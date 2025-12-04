@@ -23,7 +23,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
-	xpv2 "github.com/crossplane/crossplane-runtime/v2/apis/common/v2"
 )
 
 // VhostParameters are the configurable fields of a Vhost
@@ -59,8 +58,8 @@ type VhostObservation struct {
 
 // A VhostSpec defines the desired state of a Vhost.
 type VhostSpec struct {
-	xpv2.ManagedResourceSpec `json:",inline"`
-	ForProvider              VhostParameters `json:"forProvider"`
+	xpv1.ResourceSpec `json:",inline"`
+	ForProvider       VhostParameters `json:"forProvider"`
 }
 
 // A VhostStatus represents the observed state of a Vhost.

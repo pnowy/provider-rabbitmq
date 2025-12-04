@@ -150,6 +150,9 @@ func main() {
 	}
 
 	kingpin.FatalIfError(customresourcesgate.Setup(mgr, o), "Cannot setup CRD gate controller")
+	log.Info("Setup CRD gate controller finished")
 	kingpin.FatalIfError(rabbitmq.SetupGated(mgr, o), "Cannot setup Template controllers")
+	log.Info("Setup template controllers finished")
 	kingpin.FatalIfError(mgr.Start(ctrl.SetupSignalHandler()), "Cannot start controller manager")
+	log.Info("Controller manager started")
 }

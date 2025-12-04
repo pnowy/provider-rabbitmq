@@ -3,7 +3,6 @@ package v1alpha1
 import (
 	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	xpv2 "github.com/crossplane/crossplane-runtime/v2/apis/common/v2"
-	nsApisv1alpha1 "github.com/pnowy/provider-rabbitmq/apis/namespaced/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -12,9 +11,18 @@ type ProviderConfigStatus struct {
 	xpv1.ProviderConfigStatus `json:",inline"`
 }
 
+// ProviderCredentials required to authenticate.
+type ProviderCredentials struct {
+	// Source of the provider credentials.
+	// +kubebuilder:validation:Enum=None;Secret;InjectedIdentity;Environment;Filesystem
+	Source xpv1.CredentialsSource `json:"source"`
+
+	xpv1.CommonCredentialSelectors `json:",inline"`
+}
+
 type ProviderConfigSpec struct {
 	// Credentials required to authenticate to this provider.
-	Credentials nsApisv1alpha1.ProviderCredentials `json:"credentials"`
+	Credentials ProviderCredentials `json:"credentials"`
 }
 
 // +kubebuilder:object:root=true

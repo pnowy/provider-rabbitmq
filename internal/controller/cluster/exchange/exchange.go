@@ -23,7 +23,6 @@ import (
 	"github.com/crossplane/crossplane-runtime/v2/pkg/statemetrics"
 	"github.com/pnowy/provider-rabbitmq/apis/cluster/core/v1alpha1"
 	apisv1alpha1 "github.com/pnowy/provider-rabbitmq/apis/cluster/v1alpha1"
-	nsApisv1alpha1 "github.com/pnowy/provider-rabbitmq/apis/namespaced/v1alpha1"
 	"github.com/pnowy/provider-rabbitmq/internal/rabbitmqmeta"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
@@ -47,7 +46,6 @@ const (
 	errNotExchange      = "managed resource is not a Exchange custom resource"
 	errTrackPCUsage     = "cannot track ProviderConfig usage"
 	errGetPC            = "cannot get ProviderConfig"
-	errGetCPC           = "cannot get ClusterProviderConfig"
 	errGetCreds         = "cannot get credentials"
 	errGetFailed        = "cannot get RabbitMq Exchange"
 	errNewClient        = "cannot create new Service"
@@ -127,37 +125,17 @@ type connector struct {
 // 3. Getting the credentials specified by the ProviderConfig.
 // 4. Using the credentials to form a client.
 func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
-	cr, ok := mg.(*v1alpha1.Exchange)
-	if !ok {
-		return nil, errors.New(errNotExchange)
-	}
-
-	if err := c.usage.Track(ctx, cr); err != nil {
-		return nil, errors.Wrap(err, errTrackPCUsage)
-	}
-
-	var cd nsApisv1alpha1.ProviderCredentials
+	var cd apisv1alpha1.ProviderCredentials
 
 	// Switch to ModernManaged resource to get ProviderConfigRef
 	m := mg.(resource.ModernManaged)
 	ref := m.GetProviderConfigReference()
 
-	switch ref.Kind {
-	case "ProviderConfig":
-		pc := &apisv1alpha1.ProviderConfig{}
-		if err := c.kube.Get(ctx, types.NamespacedName{Name: ref.Name, Namespace: m.GetNamespace()}, pc); err != nil {
-			return nil, errors.Wrap(err, errGetPC)
-		}
-		cd = pc.Spec.Credentials
-	case "ClusterProviderConfig":
-		cpc := &nsApisv1alpha1.ClusterProviderConfig{}
-		if err := c.kube.Get(ctx, types.NamespacedName{Name: ref.Name}, cpc); err != nil {
-			return nil, errors.Wrap(err, errGetCPC)
-		}
-		cd = cpc.Spec.Credentials
-	default:
-		return nil, errors.Errorf("unsupported provider config kind: %s", ref.Kind)
+	pc := &apisv1alpha1.ProviderConfig{}
+	if err := c.kube.Get(ctx, types.NamespacedName{Name: ref.Name}, pc); err != nil {
+		return nil, errors.Wrap(err, errGetPC)
 	}
+	cd = pc.Spec.Credentials
 
 	data, err := resource.CommonCredentialExtractor(ctx, cd.Source, c.kube, cd.CommonCredentialSelectors)
 	if err != nil {
