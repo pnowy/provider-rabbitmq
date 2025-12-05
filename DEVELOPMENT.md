@@ -95,15 +95,14 @@ The cluster scope resources is a kind-of copy namespaced resources with a couple
     - `groupName=rabbitmq.crossplane.io` instead of `groupName=rabbitmq.m.crossplane.io`
     - `Group   = "rabbitmq.crossplane.io"` instead of `Group   = "rabbitmq.m.crossplane.io"`
     - `kubebuilder:resource:scope=Cluster` instead of `kubebuilder:resource:scope=Namespaced`
+    - `xpv1.ResourceSpec` for `TypeSpec` used instead of `xpv2.ManagedResourceSpec`
 - separated cluster-scoped `ProviderConfig` and `ProvidedConfigUsage` resources but re-used `ClusterProviderConfig` from group namespace
   specific `rabbitmq.m.crossplane.io`
 - shared `ProviderCredentials` struct from namespace scoped `ProviderConfig` with cluster scoped `ClusterProviderConfig` in order to be able
   to re-use controller logic when retrieving credentials
-- adjusted controller code
-    - `"github.com/pnowy/provider-rabbitmq/apis/cluster/core/v1alpha1"` instead of
-      `"github.com/pnowy/provider-rabbitmq/apis/namespaced/core/v1alpha1"`
-    - added `nsApisv1alpha1 "github.com/pnowy/provider-rabbitmq/apis/namespaced/v1alpha1"` as required for provider credentials:
-      `var cd nsApisv1alpha1.ProviderCredentials`
+- adjusted controller code to the v1 types used in apis
+
+Plan for the future: create separate generator to migrate namespaced resources to cluster scoped resources.
 
 ## References
 
