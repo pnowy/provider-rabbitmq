@@ -29,10 +29,10 @@ import (
 // Setup adds a controller that reconciles ProviderConfigs by accounting for
 // their current usage.
 func Setup(mgr ctrl.Manager, o controller.Options) error {
-	return setupNamespacedProviderConfig(mgr, o)
+	return setupProviderConfig(mgr, o)
 }
 
-func setupNamespacedProviderConfig(mgr ctrl.Manager, o controller.Options) error {
+func setupProviderConfig(mgr ctrl.Manager, o controller.Options) error {
 	name := providerconfig.ControllerName(v1alpha1.ProviderConfigGroupKind)
 
 	of := resource.ProviderConfigKinds{
