@@ -22,7 +22,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/v2/pkg/ratelimiter"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/providerconfig"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
-	v1alpha2 "github.com/pnowy/provider-rabbitmq/apis/cluster/v1alpha1"
+	"github.com/pnowy/provider-rabbitmq/apis/cluster/v1alpha1"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
@@ -33,12 +33,12 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 }
 
 func setupNamespacedProviderConfig(mgr ctrl.Manager, o controller.Options) error {
-	name := providerconfig.ControllerName(v1alpha2.ProviderConfigGroupKind)
+	name := providerconfig.ControllerName(v1alpha1.ProviderConfigGroupKind)
 
 	of := resource.ProviderConfigKinds{
-		Config:    v1alpha2.ProviderConfigGroupVersionKind,
-		Usage:     v1alpha2.ProviderConfigUsageGroupVersionKind,
-		UsageList: v1alpha2.ProviderConfigUsageListGroupVersionKind,
+		Config:    v1alpha1.ProviderConfigGroupVersionKind,
+		Usage:     v1alpha1.ProviderConfigUsageGroupVersionKind,
+		UsageList: v1alpha1.ProviderConfigUsageListGroupVersionKind,
 	}
 
 	r := providerconfig.NewReconciler(mgr, of,
@@ -48,7 +48,7 @@ func setupNamespacedProviderConfig(mgr ctrl.Manager, o controller.Options) error
 	return ctrl.NewControllerManagedBy(mgr).
 		Named(name).
 		WithOptions(o.ForControllerRuntime()).
-		For(&v1alpha2.ProviderConfig{}).
-		Watches(&v1alpha2.ProviderConfigUsage{}, &resource.EnqueueRequestForProviderConfig{}).
+		For(&v1alpha1.ProviderConfig{}).
+		Watches(&v1alpha1.ProviderConfigUsage{}, &resource.EnqueueRequestForProviderConfig{}).
 		Complete(ratelimiter.NewReconciler(name, r, o.GlobalRateLimiter))
 }
