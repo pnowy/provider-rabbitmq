@@ -146,7 +146,7 @@ quickstart: $(KIND) $(KUBECTL)
 		sleep 2; \
 		timeout=$$((timeout - 2)); \
 	done
-	@$(KUBECTL) apply -f examples/provider/config.yaml
+	@$(KUBECTL) apply -f examples/provider/provider-config.yaml
 
 dev-clean: $(KIND) $(KUBECTL)
 	@$(INFO) Deleting kind cluster

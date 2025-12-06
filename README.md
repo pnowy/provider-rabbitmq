@@ -1,6 +1,7 @@
 # Crossplane Provider for RabbitMQ
 
-`provider-rabbitmq` is a [Crossplane](https://crossplane.io/) provider that enables management of RabbitMQ resources through Kubernetes custom resources. This
+`provider-rabbitmq` is a [Crossplane](https://crossplane.io/) provider that enables management of RabbitMQ resources through Kubernetes
+custom resources. This
 provider allows you to manage RabbitMQ resources using Kubernetes-style declarative configurations.
 
 ## Overview
@@ -87,7 +88,7 @@ stringData:
     }
 ```
 
-Then create a `ProviderConfig` to use these credentials:
+Then create a `ProviderConfig` (for cluster scope resources):
 
 ```yaml
 apiVersion: rabbitmq.crossplane.io/v1alpha1
@@ -104,7 +105,14 @@ spec:
 ```
 
 - For each RabbitMQ instance you need one or more `ProviderConfig` resources
-- The `ProviderConfig` resource is used to store the RabbitMQ endpoint, username and password details that are required to connect to the RabbitMQ API server
+- The `ProviderConfig` resource is used to store the RabbitMQ endpoint, username and password details that are required to connect to the
+  RabbitMQ API server
+
+With **Crossplane V2** there is a separate group `rabbitmq.m.crossplane.io/v1alpha1` and there are `ProviderConfig` and
+`ClusterProviderConfig`
+resources.
+
+See more in [crossplane v2 migration section](#crossplane-v2)
 
 ## Custom Resource Definitions
 
@@ -126,26 +134,84 @@ The method is a `Makefile` target that sets up a complete development environmen
 
 1. **Creates a local Kubernetes cluster** using Kind (Kubernetes in Docker) named "crossplane-rabbitmq-quickstart"
 2. **Sets up the Kubernetes context** to point to the newly created cluster
-3. **Installs Crossplane using Helm in a dedicated "crossplane-system" namespace** (a Kubernetes add-on for managing infrastructure resources)
+3. **Installs Crossplane using Helm in a dedicated "crossplane-system" namespace** (a Kubernetes add-on for managing infrastructure
+   resources)
 4. **Installs RabbitMQ using Helm in a dedicated "rabbitmq" namespace**
 5. **Installs Provider RabbitMQ**:
     - Applies the provider specification from `examples/provider/provider.yaml`
     - Applies configuration from `examples/provider/config.yaml`
 
-This method provides developers with a one-command solution to set up a complete development environment with all necessary components for working with the
+This method provides developers with a one-command solution to set up a complete development environment with all necessary components for
+working with the
 Crossplane RabbitMQ provider.
 
-As a next step you can apply some examples from the [examples/sample](examples/sample) directory (e.g. `vhost.yaml`). To log in into RabbitMQ admin
-console from localhost execute the command: `k port-forward svc/rabbitmq 15672:15672 -n rabbitmq` and then open http://localhost:15672 in your browser. Login
+As a next step you can apply some examples from the [examples/sample](examples/sample) directory (e.g. `vhost.yaml`). To log in into
+RabbitMQ admin
+console from localhost execute the command: `k port-forward svc/rabbitmq 15672:15672 -n rabbitmq` and then open http://localhost:15672 in
+your browser. Login
 with username `guest` and password `guest`.
 
-## Crossplane V2 Migration
+## Crossplane V2
 
-As with version 2 of crossplane the namespace resources have been supported below you will find the migration guide for the provider.
+With Crossplane V2 the namespaced resources have been supported. Below you will find the migration guide for the provider.
 
-1. Switch provider resource group from `rabbitmq.crossplane.io` to `rabbitmq.m.crossplane.io`. For example:
+If you want you can still use cluster scope resources under the existing group `rabbitmq.crossplane.io`. There is no plan to remove them. If
+that's you plan just upgrade provider to new version and all existing resources should work as is.
 
-`TODO`
+If you would like to start using namespace scoped resources you have to start using CRDs within `rabbitmq.m.crossplane.io` group. 
+
+There are separate providers:
+
+For namespace scope:
+
+```yaml
+apiVersion: rabbitmq.m.crossplane.io/v1alpha1
+kind: ProviderConfig
+metadata:
+  name: provider-rabbitmq
+  namespace: rabbitmq # remember about namespace as this is namespaced object
+spec:
+  credentials:
+    source: Secret
+    secretRef:
+      name: rabbitmq-credentials
+      namespace: rabbitmq
+      key: credentials
+```
+
+For cluster scope:
+
+```yaml
+apiVersion: rabbitmq.m.crossplane.io/v1alpha1
+kind: ClusterProviderConfig
+metadata:
+  name: provider-rabbitmq
+spec:
+  credentials:
+    source: Secret
+    secretRef:
+      name: rabbitmq-credentials
+      namespace: rabbitmq
+      key: credentials
+```
+
+With above all resources need to reference provider using extra `kind` field:
+
+```yaml
+apiVersion: core.rabbitmq.m.crossplane.io/v1alpha1
+kind: Queue
+metadata:
+  name: myqueue
+  namespace: rabbitmq
+spec:
+  forProvider:
+    vhost: demo
+  providerConfigRef:
+    name: provider-rabbitmq
+    kind: ProviderConfig # this is needed with v2 and `rabbitmq.m.crossplane.io` group
+```
+
+See more examples in [examples/sample](./examples/sample) directory.
 
 ## Development
 
