@@ -1,0 +1,15 @@
+apiVersion: core.rabbitmq.m.crossplane.io/v1alpha1
+kind: User
+metadata:
+  name: demo
+  namespace: rabbitmq
+spec:
+  forProvider:
+    username: demo
+    userSettings:
+      password: demo2
+      tags:
+        - "administrator"
+  providerConfigRef:
+    name: provider-rabbitmq
+    kind: ProviderConfig

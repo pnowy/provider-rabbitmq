@@ -14,14 +14,6 @@ The RabbitMQ provider offers the following features:
 - **Bindings**: Configure bindings between exchanges and queues
 - **Permissions**: Manage user permissions within virtual hosts
 
-Planned features:
-
-- **Policies**: Manage RabbitMQ policies for queues and exchanges
-- **Operator policies**: Manage operator policies for queues
-- **Topic permissions**: Manage a user's set of topic permissions
-- **Federation upstream**: Manage federation upstream
-- **Shovel**: Manage dynamic shovel
-
 ## Getting Started
 
 ### Installation
@@ -146,6 +138,14 @@ Crossplane RabbitMQ provider.
 As a next step you can apply some examples from the [examples/sample](examples/sample) directory (e.g. `vhost.yaml`). To log in into RabbitMQ admin
 console from localhost execute the command: `k port-forward svc/rabbitmq 15672:15672 -n rabbitmq` and then open http://localhost:15672 in your browser. Login
 with username `guest` and password `guest`.
+
+## Crossplane V2 Migration
+
+As with version 2 of crossplane the namespace resources have been supported below you will find the migration guide for the provider.
+
+1. Switch provider resource group from `rabbitmq.crossplane.io` to `rabbitmq.m.crossplane.io`. For example:
+
+`TODO`
 
 ## Development
 

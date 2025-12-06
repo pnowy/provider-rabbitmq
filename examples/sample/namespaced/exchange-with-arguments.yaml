@@ -1,0 +1,18 @@
+apiVersion: core.rabbitmq.m.crossplane.io/v1alpha1
+kind: Exchange
+metadata:
+  name: myexchange-with-arguments
+  namespace: rabbitmq
+spec:
+  forProvider:
+    vhost: demo
+    exchangeSettings:
+      type: fanout
+      durable: true
+      autoDelete: false
+      arguments:
+        "x-delayed-type": "direct"
+        "x-expires": "300000"  # 5 minutes
+  providerConfigRef:
+    name: provider-rabbitmq
+    kind: ProviderConfig

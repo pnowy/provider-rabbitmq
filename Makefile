@@ -123,7 +123,7 @@ dev-init: $(KIND) $(KUBECTL)
 	@helm upgrade rabbitmq helm/rabbitmq --install --namespace rabbitmq --create-namespace
 	@$(INFO) Installing Provider RabbitMq CRDs
 	@$(KUBECTL) apply -R -f package/crds
-	@$(KUBECTL) apply -f examples/provider/config-dev.yaml
+	@$(KUBECTL) apply -f examples/provider/development
 
 quickstart: $(KIND) $(KUBECTL)
 	@$(INFO) Creating kind cluster
@@ -131,20 +131,32 @@ quickstart: $(KIND) $(KUBECTL)
 	@$(KUBECTL) cluster-info --context kind-crossplane-rabbitmq-quickstart
 	@$(INFO) Installing Crossplane
 	@helm dep update helm/crossplane
-	@helm upgrade crossplane helm/crossplane --install --namespace crossplane-system --create-namespace
+	@helm upgrade crossplane helm/crossplane --install --namespace crossplane-system --create-namespace --wait
 	@$(INFO) Installing RabbitMq
 	@helm dep update helm/rabbitmq
-	@helm upgrade rabbitmq helm/rabbitmq --install --namespace rabbitmq --create-namespace
+	@helm upgrade rabbitmq helm/rabbitmq --install --namespace rabbitmq --create-namespace --wait
 	@$(INFO) Installing RabbitMq provider
 	@$(KUBECTL) apply -f examples/provider/provider.yaml
-	sleep 10
+	@$(INFO) Waiting for provider-rabbitmq pod to be created and ready
+	@timeout=300; \
+	while [ $$timeout -gt 0 ]; do \
+		if $(KUBECTL) get pods -n crossplane-system 2>/dev/null | grep -q provider-rabbitmq; then \
+			$(KUBECTL) wait --for=condition=ready pod -l pkg.crossplane.io/provider=provider-rabbitmq -n crossplane-system --timeout=300s && break; \
+		fi; \
+		sleep 2; \
+		timeout=$$((timeout - 2)); \
+	done
 	@$(KUBECTL) apply -f examples/provider/config.yaml
 
 dev-clean: $(KIND) $(KUBECTL)
 	@$(INFO) Deleting kind cluster
 	@$(KIND) delete cluster --name=$(PROJECT_NAME)-dev
 
-.PHONY: submodules fallthrough test-integration run dev dev-clean
+quickstart-clean: $(KIND) $(KUBECTL)
+	@$(INFO) Deleting kind cluster
+	@$(KIND) delete cluster --name=crossplane-rabbitmq-quickstart
+
+.PHONY: submodules fallthrough test-integration run quickstart dev dev-clean quickstart-clean
 
 # ====================================================================================
 # Special Targets

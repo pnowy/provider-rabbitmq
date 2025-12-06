@@ -1,0 +1,11 @@
+apiVersion: rabbitmq.crossplane.io/v1alpha1
+kind: ProviderConfig
+metadata:
+  name: provider-rabbitmq
+spec:
+  credentials:
+    source: Secret
+    secretRef:
+      name: rabbitmq-credentials
+      namespace: rabbitmq
+      key: credentials

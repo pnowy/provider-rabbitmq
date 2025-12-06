@@ -1,0 +1,16 @@
+apiVersion: core.rabbitmq.m.crossplane.io/v1alpha1
+kind: Queue
+metadata:
+  name: myqueue-name-in-provider
+  namespace: rabbitmq
+spec:
+  forProvider:
+    vhost: demo
+    name: myqueue-name-in-provider
+    queueSettings:
+      type: classic
+      durable: true
+      autoDelete: false
+  providerConfigRef:
+    name: provider-rabbitmq
+    kind: ProviderConfig
